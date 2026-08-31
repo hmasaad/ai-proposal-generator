@@ -1,6 +1,16 @@
-import { generateObject } from "ai";
-import { openai } from "@ai-sdk/openai";
-import { proposalDraftSchema, requirementBriefSchema } from "./schemas";
+import {
+  computeBands,
+  ratesForType,
+  similarBids,
+  weekOneNeeds,
+} from "./accuracy";
+import { generateStructured } from "./model";
+import {
+  proposalDraftJsonSchema,
+  proposalDraftSchema,
+  requirementBriefJsonSchema,
+  requirementBriefSchema,
+} from "./schemas";
 import {
   DRAFT_SYSTEM,
   EXTRACT_SYSTEM,
@@ -9,9 +19,13 @@ import {
   extractPrompt,
   reviewPrompt,
 } from "./prompts";
+import { indexProposal, retrieveContext } from "./rag/retrieve";
 import type {
   AgentStepEvent,
+  BidComparable,
   CompanyProfile,
+  Lesson,
+  ProjectType,
   Proposal,
   SourceDocument,
 } from "./types";
@@ -20,10 +34,6 @@ export type AgentEvent =
   | { type: "step"; step: AgentStepEvent }
   | { type: "proposal"; proposal: Proposal }
   | { type: "error"; message: string };
-
-function model() {
-  return openai(process.env.OPENAI_MODEL || "gpt-4o");
-}
 
 function totals(
   estimates: { role: string; hours: number; rate: number; cost: number }[],
@@ -44,15 +54,19 @@ function totals(
 export async function runProposalAgent(input: {
   sources: SourceDocument[];
   company: CompanyProfile;
+  lessons?: Lesson[];
+  projectType?: ProjectType;
+  pastBids?: BidComparable[];
   onEvent: (event: AgentEvent) => void;
 }) {
-  const { sources, company, onEvent } = input;
-
-  if (!process.env.OPENAI_API_KEY) {
-    throw new Error(
-      "Missing OPENAI_API_KEY. Copy .env.example to .env.local and add your key.",
-    );
-  }
+  const {
+    sources,
+    lessons = [],
+    projectType = "web",
+    pastBids = [],
+    onEvent,
+  } = input;
+  const company = ratesForType(input.company, projectType);
 
   if (!sources.length || sources.every((source) => !source.text.trim())) {
     throw new Error("Add at least one source with content before generating.");
@@ -72,11 +86,33 @@ export async function runProposalAgent(input: {
     step: { id: "extract", label: "Extracting requirements and constraints" },
   });
 
-  const extracted = await generateObject({
-    model: model(),
+  const extracted = await generateStructured({
     schema: requirementBriefSchema,
+    jsonSchema: requirementBriefJsonSchema,
     system: EXTRACT_SYSTEM,
     prompt: extractPrompt(sources),
+  });
+
+  onEvent({
+    type: "step",
+    step: {
+      id: "learn",
+      label: "Retrieving past proposals and mistakes",
+    },
+  });
+
+  const memory = await retrieveContext(sources, lessons);
+
+  onEvent({
+    type: "step",
+    step: {
+      id: "learn",
+      label: "Retrieving past proposals and mistakes",
+      detail:
+        memory.length === 0
+          ? "No studio memory yet"
+          : `${memory.length} chunk${memory.length === 1 ? "" : "s"} from RAG`,
+    },
   });
 
   onEvent({
@@ -90,43 +126,60 @@ export async function runProposalAgent(input: {
 
   onEvent({
     type: "step",
-    step: { id: "estimate", label: "Building effort and cost model" },
+    step: {
+      id: "estimate",
+      label: "Building effort and cost model",
+      detail: `${projectType} rate mix · likely / lean / padded bands`,
+    },
   });
 
   onEvent({
     type: "step",
-    step: { id: "draft", label: "Drafting the proposal" },
+    step: { id: "draft", label: "Drafting the proposal with retrieved memory" },
   });
 
-  const drafted = await generateObject({
-    model: model(),
+  const drafted = await generateStructured({
     schema: proposalDraftSchema,
+    jsonSchema: proposalDraftJsonSchema,
     system: DRAFT_SYSTEM,
     prompt: draftPrompt(
       sources,
       company,
       JSON.stringify(extracted.object, null, 2),
+      memory,
+      projectType,
+      pastBids,
     ),
   });
 
   onEvent({
     type: "step",
-    step: { id: "review", label: "Reviewing risks, assumptions, and numbers" },
+    step: {
+      id: "review",
+      label: "Reviewing against retrieved mistakes",
+    },
   });
 
-  const reviewed = await generateObject({
-    model: model(),
+  const reviewed = await generateStructured({
     schema: proposalDraftSchema,
+    jsonSchema: proposalDraftJsonSchema,
     system: REVIEW_SYSTEM,
     prompt: reviewPrompt(
       company,
       JSON.stringify(drafted.object, null, 2),
       extracted.object.unknownOrMissing,
+      memory,
     ),
   });
 
   const draft = reviewed.object;
   const rolled = totals(draft.estimates, draft.contingencyPct);
+  const bands = computeBands(rolled.totalHours, rolled.totalCost);
+  const comparables = similarBids(pastBids, {
+    projectType,
+    hours: rolled.totalHours,
+    cost: rolled.totalCost,
+  });
 
   const proposal: Proposal = {
     id: crypto.randomUUID(),
@@ -149,7 +202,30 @@ export async function runProposalAgent(input: {
     openQuestions: draft.openQuestions,
     nextSteps: draft.nextSteps,
     brief: extracted.object,
+    projectType,
+    estimateBands: bands,
+    leanCuts: draft.leanCuts ?? [],
+    paddedAdds: draft.paddedAdds ?? [],
+    weekOneNeeds: weekOneNeeds(
+      draft.weekOneNeeds,
+      draft.openQuestions,
+      extracted.object.unknownOrMissing,
+    ),
+    comparables,
+    outcome: "draft",
+    appliedLessonIds: memory
+      .filter((hit) => hit.sourceType === "lesson")
+      .map((hit) => hit.sourceId),
+    retrievedMemory: memory.map((hit) => ({
+      id: hit.id,
+      title: hit.title,
+      sourceType: hit.sourceType,
+      text: hit.text,
+      score: hit.score,
+    })),
   };
+
+  void indexProposal(proposal).catch(() => undefined);
 
   onEvent({ type: "proposal", proposal });
   return proposal;

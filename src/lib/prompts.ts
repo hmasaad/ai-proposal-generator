@@ -1,4 +1,13 @@
-import type { CompanyProfile, SourceDocument } from "./types";
+import { formatPastBids } from "./accuracy";
+import { PROJECT_TYPES } from "./defaults";
+import type { RetrievedChunk } from "./rag/types";
+import type {
+  BidComparable,
+  CompanyProfile,
+  ProjectType,
+  SourceDocument,
+} from "./types";
+import { formatRetrieved } from "./rag/retrieve";
 
 export function formatSources(sources: SourceDocument[]) {
   return sources
@@ -43,11 +52,16 @@ export const DRAFT_SYSTEM = `You are a principal (sales + delivery) at a softwar
 Rules:
 - Be specific to THIS client. No generic "we will use agile" padding.
 - Scope must be explicit: included vs excluded.
-- Estimates must use the vendor rate card. Hours should be realistic for the must-have scope only. Nice-to-haves go in excluded scope or a later phase unless the client said they are required.
+- Estimates must use the vendor rate card. The estimate table is the LIKELY band: realistic hours for must-have scope only. Nice-to-haves go in excluded scope or a later phase unless the client said they are required.
+- Honor the project-type mix. Do not staff a mobile/data/integration job as a generic web app.
+- leanCuts: 3–6 concrete cuts that would land an ~18% smaller (lean) bid without pretending the same scope still fits.
+- paddedAdds: 3–6 specific unknowns that justify ~22% more hours (not generic "complexity").
+- weekOneNeeds: concrete artifacts, access, and decisions the client must provide in week 1. Not "align stakeholders".
 - Honor stated budget and deadline when possible; if they conflict with quality, say so and propose a phased cut.
 - Assumptions and risks should be the ones that actually move cost or date.
 - Open questions should be the minimum set needed before kickoff.
 - Write in confident, plain English. No buzzword stacks.
+- Apply retrieved studio memory (past proposals and logged mistakes). If a lesson conflicts with this client's written requirements, follow the client and note it in openQuestions.
 - executiveSummary: 2–3 paragraphs.
 - understanding and approach: 2–4 short paragraphs each.`;
 
@@ -55,22 +69,36 @@ export function draftPrompt(
   sources: SourceDocument[],
   company: CompanyProfile,
   briefJson: string,
+  memory: RetrievedChunk[],
+  projectType: ProjectType,
+  pastBids: BidComparable[],
 ) {
+  const preset = PROJECT_TYPES.find((item) => item.id === projectType);
   return `Write a complete project proposal from the brief and original sources.
 
 VENDOR PROFILE
 ${formatCompany(company)}
 
+PROJECT TYPE PRESET: ${preset?.label ?? projectType}
+${preset?.mix ?? ""}
+Staff extra roles from the rate card when they apply to this type.
+
 STRUCTURED BRIEF
 ${briefJson}
+
+PAST BIDS (internal calibration — do not name win/loss in client-facing prose; use them to price discovery, integrations, and exclusions)
+${formatPastBids(pastBids)}
+
+RETRIEVED STUDIO MEMORY (RAG — past proposals and mistakes; apply where relevant)
+${formatRetrieved(memory)}
 
 ORIGINAL SOURCES (for color and quotes, not extra scope)
 ${formatSources(sources)}
 
-Compute estimate line items from the rate card. cost = hours * rate. Use whole hours. Include PM, design, engineering, and QA as appropriate. contingencyPct should default to the vendor value unless the risk profile warrants more.`;
+Compute estimate line items from the rate card. cost = hours * rate. Use whole hours. Include PM, design, engineering, QA, and any specialist roles on the card. contingencyPct should default to the vendor value unless the risk profile warrants more. Also fill leanCuts, paddedAdds, and weekOneNeeds.`;
 }
 
-export const REVIEW_SYSTEM = `You are a skeptical delivery director reviewing a draft proposal before it goes to a client. Tighten numbers, catch missing exclusions, and make risks honest.
+export const REVIEW_SYSTEM = `You are a skeptical delivery director reviewing a draft proposal before it goes to a client. Tighten numbers, catch missing exclusions, and make risks honest. You must check the draft against retrieved studio memory — if we have already lost money or trust on a similar mistake, the draft should not repeat it.
 
 Return a full corrected proposal object, not a diff. Keep the same overall structure. Recalculate cost fields so they stay consistent (cost = hours * rate).`;
 
@@ -78,6 +106,7 @@ export function reviewPrompt(
   company: CompanyProfile,
   draftJson: string,
   unknowns: string[],
+  memory: RetrievedChunk[],
 ) {
   return `Review and improve this draft. Known gaps from analysis:
 ${unknowns.map((item) => `- ${item}`).join("\n") || "- none listed"}
@@ -85,8 +114,11 @@ ${unknowns.map((item) => `- ${item}`).join("\n") || "- none listed"}
 VENDOR PROFILE
 ${formatCompany(company)}
 
+RETRIEVED STUDIO MEMORY (RAG)
+${formatRetrieved(memory)}
+
 DRAFT
 ${draftJson}
 
-Fix: unrealistic hours, missing out-of-scope items, vague assumptions, risks that are slogans, and next steps that are not actionable.`;
+Fix: unrealistic hours, missing out-of-scope items, vague assumptions, risks that are slogans, next steps that are not actionable, missing week-1 artifacts, empty leanCuts/paddedAdds, and any repeat of a retrieved mistake. Keep leanCuts, paddedAdds, and weekOneNeeds filled.`;
 }

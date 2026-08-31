@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { AppHeader } from "@/components/AppHeader";
-import { DEFAULT_COMPANY } from "@/lib/defaults";
+import { DEFAULT_COMPANY, PROJECT_TYPES } from "@/lib/defaults";
 import { loadCompany, saveCompany } from "@/lib/storage";
 import type { CompanyProfile, RateCard } from "@/lib/types";
 
@@ -167,6 +167,27 @@ export default function SettingsPage() {
                   >
                     Remove
                   </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <div>
+            <p className="text-sm text-ink-soft">Rate presets by project type</p>
+            <p className="mt-1 text-sm leading-6 text-ink-soft">
+              Generate uses your rate card, then layers specialist roles for the type you pick. Edit the
+              base card here; extra roles inherit from the senior engineer rate.
+            </p>
+            <ul className="mt-3 grid gap-3 sm:grid-cols-2">
+              {PROJECT_TYPES.map((item) => (
+                <li key={item.id} className="rounded-2xl border border-rule bg-white/50 px-4 py-3">
+                  <p className="font-medium">{item.label}</p>
+                  <p className="mt-1 text-sm leading-6 text-ink-soft">{item.mix}</p>
+                  {item.extraRoles.length > 0 && (
+                    <p className="mt-2 text-xs text-moss">
+                      Adds {item.extraRoles.map((role) => role.role).join(", ")}
+                    </p>
+                  )}
                 </li>
               ))}
             </ul>

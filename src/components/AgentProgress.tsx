@@ -16,7 +16,7 @@ export function AgentProgress({
 
   return (
     <div className="rounded-2xl border border-rule bg-white/50 p-4">
-      <ol className="grid grid-cols-2 gap-2 sm:grid-cols-6">
+      <ol className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
         {AGENT_STEPS.map((step, index) => {
           const done = running && index < active;
           const isCurrent = running && index === active;

@@ -59,7 +59,19 @@ export function proposalToMarkdown(
     "",
     `Subtotal: ${money(subtotal, currency)}`,
     `Contingency (${proposal.contingencyPct}%): ${money(contingency, currency)}`,
-    `**Total: ${money(proposal.totalCost, currency)}** (${proposal.totalHours} hours)`,
+    `**Likely (recommended): ${money(proposal.totalCost, currency)}** (${proposal.totalHours} hours)`,
+    ...(proposal.estimateBands
+      ? [
+          `Lean: ${money(proposal.estimateBands.leanCost, currency)} (${proposal.estimateBands.leanHours} hours)`,
+          `Padded: ${money(proposal.estimateBands.paddedCost, currency)} (${proposal.estimateBands.paddedHours} hours)`,
+        ]
+      : []),
+    ...(proposal.leanCuts?.length
+      ? ["", "To hit lean:", ...proposal.leanCuts.map((item) => `- ${item}`)]
+      : []),
+    ...(proposal.paddedAdds?.length
+      ? ["", "What padded covers:", ...proposal.paddedAdds.map((item) => `- ${item}`)]
+      : []),
     "",
     "## Assumptions",
     ...proposal.assumptions.map((item) => `- ${item}`),
@@ -73,6 +85,13 @@ export function proposalToMarkdown(
     "## Open questions",
     ...proposal.openQuestions.map((item) => `- ${item}`),
     "",
+    ...(proposal.weekOneNeeds?.length
+      ? [
+          "## Week-1 client checklist",
+          ...proposal.weekOneNeeds.map((item) => `- ${item}`),
+          "",
+        ]
+      : []),
     "## Next steps",
     ...proposal.nextSteps.map((item) => `- ${item}`),
   ];

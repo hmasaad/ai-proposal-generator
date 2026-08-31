@@ -1,5 +1,6 @@
 "use client";
 
+import { projectTypeLabel } from "@/lib/accuracy";
 import { money } from "@/lib/format";
 import type { Proposal } from "@/lib/types";
 
@@ -34,7 +35,10 @@ export function ProposalDocument({
 
   return (
     <article className="print-sheet mx-auto max-w-3xl rounded-3xl border border-rule bg-[#fcfaf6] px-8 py-10 shadow-[0_20px_50px_rgba(28,25,21,0.06)] sm:px-12">
-      <p className="text-xs uppercase tracking-[0.22em] text-moss">Project proposal</p>
+      <p className="text-xs uppercase tracking-[0.22em] text-moss">
+        Project proposal
+        {proposal.projectType ? ` · ${projectTypeLabel(proposal.projectType)}` : ""}
+      </p>
       <h1 className="mt-3 font-serif text-4xl leading-tight tracking-tight">
         {proposal.projectTitle}
       </h1>
@@ -142,13 +146,74 @@ export function ProposalDocument({
             <dt className="text-ink-soft">Contingency ({proposal.contingencyPct}%)</dt>
             <dd>{money(contingency, currency)}</dd>
           </div>
-          <div className="flex justify-between font-medium">
-            <dt>Total</dt>
-            <dd>
-              {money(proposal.totalCost, currency)} · {proposal.totalHours} hours
-            </dd>
-          </div>
         </dl>
+        {proposal.estimateBands ? (
+          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+            {(
+              [
+                {
+                  id: "lean",
+                  label: "Lean",
+                  hours: proposal.estimateBands.leanHours,
+                  cost: proposal.estimateBands.leanCost,
+                  note: "Must-haves only, after the cuts below",
+                },
+                {
+                  id: "likely",
+                  label: "Likely",
+                  hours: proposal.estimateBands.likelyHours,
+                  cost: proposal.estimateBands.likelyCost,
+                  note: "Recommended send number",
+                },
+                {
+                  id: "padded",
+                  label: "Padded",
+                  hours: proposal.estimateBands.paddedHours,
+                  cost: proposal.estimateBands.paddedCost,
+                  note: "If the unknowns below stay open",
+                },
+              ] as const
+            ).map((band) => (
+              <div
+                key={band.id}
+                className={`rounded-2xl border px-3 py-3 ${
+                  band.id === "likely" ? "border-forest bg-paper" : "border-rule bg-white/50"
+                }`}
+              >
+                <p className="text-xs uppercase tracking-[0.16em] text-moss">{band.label}</p>
+                <p className="mt-1 font-medium">
+                  {money(band.cost, currency)}
+                </p>
+                <p className="text-sm text-ink-soft">{band.hours} hours</p>
+                <p className="mt-1 text-xs leading-5 text-ink-soft">{band.note}</p>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="mt-3 font-medium">
+            Total {money(proposal.totalCost, currency)} · {proposal.totalHours} hours
+          </p>
+        )}
+        {proposal.leanCuts && proposal.leanCuts.length > 0 && (
+          <div className="mt-4">
+            <h3 className="text-sm font-medium">To hit lean</h3>
+            <ul className="mt-1 list-disc pl-5 text-sm">
+              {proposal.leanCuts.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {proposal.paddedAdds && proposal.paddedAdds.length > 0 && (
+          <div className="mt-3">
+            <h3 className="text-sm font-medium">What padded covers</h3>
+            <ul className="mt-1 list-disc pl-5 text-sm">
+              {proposal.paddedAdds.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          </div>
+        )}
       </Section>
 
       <Section id="assumptions" title="Assumptions">
@@ -180,6 +245,19 @@ export function ProposalDocument({
           ))}
         </ul>
       </Section>
+
+      {proposal.weekOneNeeds && proposal.weekOneNeeds.length > 0 && (
+        <Section id="week-one" title="Week-1 client checklist">
+          <p className="text-sm text-ink-soft">
+            Send this list with the proposal. Unanswered items are why the padded band exists.
+          </p>
+          <ul className="list-disc space-y-2 pl-5">
+            {proposal.weekOneNeeds.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+        </Section>
+      )}
 
       <Section id="next" title="Next steps">
         <ol className="list-decimal space-y-2 pl-5">

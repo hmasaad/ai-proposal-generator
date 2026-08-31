@@ -1,6 +1,12 @@
 import { runProposalAgent } from "@/lib/agent";
 import { DEFAULT_COMPANY } from "@/lib/defaults";
-import type { CompanyProfile, SourceDocument } from "@/lib/types";
+import type {
+  BidComparable,
+  CompanyProfile,
+  Lesson,
+  ProjectType,
+  SourceDocument,
+} from "@/lib/types";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -14,14 +20,23 @@ export async function POST(request: Request) {
 
   let sources: SourceDocument[] = [];
   let company: CompanyProfile = DEFAULT_COMPANY;
+  let lessons: Lesson[] = [];
+  let projectType: ProjectType = "web";
+  let pastBids: BidComparable[] = [];
 
   try {
     const body = (await request.json()) as {
       sources?: SourceDocument[];
-      company?: CompanyProfile;
+      company?: CompanyProfile | null;
+      lessons?: Lesson[];
+      projectType?: ProjectType;
+      pastBids?: BidComparable[];
     };
     sources = body.sources ?? [];
-    company = { ...DEFAULT_COMPANY, ...body.company };
+    company = { ...DEFAULT_COMPANY, ...(body.company ?? {}) };
+    lessons = body.lessons ?? [];
+    projectType = body.projectType ?? "web";
+    pastBids = body.pastBids ?? [];
   } catch {
     return Response.json({ error: "Invalid JSON body" }, { status: 400 });
   }
@@ -36,6 +51,9 @@ export async function POST(request: Request) {
         await runProposalAgent({
           sources,
           company,
+          lessons,
+          projectType,
+          pastBids,
           onEvent: (event) => {
             if (event.type === "step") send("step", event.step);
             if (event.type === "proposal") send("proposal", event.proposal);

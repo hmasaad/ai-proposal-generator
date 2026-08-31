@@ -6,8 +6,8 @@ import { AppHeader } from "@/components/AppHeader";
 import { AgentProgress } from "@/components/AgentProgress";
 import { SourceIntake } from "@/components/SourceIntake";
 import { describeStep, readSse } from "@/lib/client";
-import { DEFAULT_COMPANY } from "@/lib/defaults";
-import { loadCompany, saveProposal } from "@/lib/storage";
+import { DEFAULT_COMPANY, PROJECT_TYPES } from "@/lib/defaults";
+import { loadCompany, loadHistory, loadLessons, saveProposal } from "@/lib/storage";
 import { SAMPLE_PROPOSAL } from "@/lib/sample-proposal";
 import { SAMPLE_SOURCES } from "@/lib/sample-rfp";
 import { money } from "@/lib/format";
@@ -15,6 +15,7 @@ import type {
   AgentStepEvent,
   AgentStepId,
   CompanyProfile,
+  ProjectType,
   Proposal,
   SourceDocument,
 } from "@/lib/types";
@@ -27,6 +28,7 @@ export default function HomePage() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [company, setCompany] = useState<CompanyProfile>(DEFAULT_COMPANY);
+  const [projectType, setProjectType] = useState<ProjectType>("web");
 
   useEffect(() => {
     setCompany(loadCompany());
@@ -42,7 +44,13 @@ export default function HomePage() {
       const response = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sources, company }),
+        body: JSON.stringify({
+          sources,
+          company,
+          lessons: loadLessons(),
+          projectType,
+          pastBids: loadHistory(),
+        }),
       });
 
       if (!response.ok && response.headers.get("content-type")?.includes("application/json")) {
@@ -85,14 +93,18 @@ export default function HomePage() {
           </h1>
           <p className="mt-4 max-w-xl text-[15px] leading-7 text-ink-soft">
             Drop in client emails, RFPs, meeting notes, and past work. The agent extracts
-            requirements, writes scope and timeline, and estimates against your rate card.
+            requirements, then uses RAG over previous proposals and logged mistakes before it
+            writes scope, timeline, and estimates.
           </p>
 
           <div className="mt-8 flex flex-wrap gap-2">
             <button
               type="button"
               disabled={running}
-              onClick={() => setSources(SAMPLE_SOURCES)}
+              onClick={() => {
+                setSources(SAMPLE_SOURCES);
+                setProjectType("integration");
+              }}
               className="rounded-full border border-rule px-4 py-2 text-sm"
             >
               Load sample Meridian Health brief
@@ -129,9 +141,40 @@ export default function HomePage() {
           <div className="rounded-3xl border border-rule bg-white/40 p-5">
             <h2 className="font-serif text-2xl">Generate</h2>
             <p className="mt-2 text-sm leading-6 text-ink-soft">
-              Uses {company.name} rates and stack. Edit them in Studio profile before you send
-              a real bid.
+              Uses {company.name} rates and the{" "}
+              {PROJECT_TYPES.find((item) => item.id === projectType)?.label} mix.
+              Edit the base card in Studio profile before you send a real bid.
             </p>
+            <fieldset className="mt-4">
+              <legend className="text-sm text-ink-soft">Project type</legend>
+              <div className="mt-2 grid gap-2">
+                {PROJECT_TYPES.map((item) => (
+                  <label
+                    key={item.id}
+                    className={`flex cursor-pointer items-start gap-3 rounded-2xl border px-3 py-2 text-sm ${
+                      projectType === item.id
+                        ? "border-forest bg-paper"
+                        : "border-rule bg-white/40"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="projectType"
+                      value={item.id}
+                      checked={projectType === item.id}
+                      onChange={() => setProjectType(item.id)}
+                      className="mt-1"
+                    />
+                    <span>
+                      <span className="font-medium">{item.label}</span>
+                      <span className="mt-0.5 block text-xs leading-5 text-ink-soft">
+                        {item.mix}
+                      </span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
             <dl className="mt-4 space-y-2 text-sm">
               <div className="flex justify-between gap-3">
                 <dt className="text-ink-soft">Currency</dt>
@@ -163,9 +206,9 @@ export default function HomePage() {
               {running ? "Agent working…" : "Generate proposal"}
             </button>
             <p className="mt-3 text-xs leading-5 text-ink-soft">
-              Needs <code className="rounded bg-paper-2 px-1">OPENAI_API_KEY</code> in{" "}
-              <code className="rounded bg-paper-2 px-1">.env.local</code>. Three model passes:
-              extract, draft, review.
+              Needs <code className="rounded bg-paper-2 px-1">GEMINI_API_KEY</code> in{" "}
+              <code className="rounded bg-paper-2 px-1">.env.local</code>. Gemini embeds studio
+              memory, retrieves the closest chunks, then drafts and reviews.
             </p>
           </div>
 

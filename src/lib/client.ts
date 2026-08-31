@@ -3,6 +3,7 @@ import type { AgentStepEvent, AgentStepId } from "./types";
 export const AGENT_STEPS: { id: AgentStepId; label: string }[] = [
   { id: "ingest", label: "Ingest" },
   { id: "extract", label: "Extract" },
+  { id: "learn", label: "RAG" },
   { id: "scope", label: "Scope" },
   { id: "estimate", label: "Estimate" },
   { id: "draft", label: "Draft" },

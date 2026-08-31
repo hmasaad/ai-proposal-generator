@@ -2,7 +2,7 @@
 
 An AI agent for software houses that turns messy client intake into a proposal you can actually send.
 
-Sales, BAs, and PMs usually assemble a bid from emails, RFPs, meeting notes, requirements docs, and old proposals. This agent reads those sources, extracts a structured brief, then drafts scope, timeline, estimates, assumptions, and risks against your studio rate card.
+Sales, BAs, and PMs usually assemble a bid from emails, RFPs, meeting notes, requirements docs, and old proposals. This agent reads those sources, extracts a structured brief, retrieves similar past work with RAG, then drafts scope, timeline, estimates, assumptions, and risks against your studio rate card.
 
 ## What it produces
 
@@ -12,33 +12,36 @@ Sales, BAs, and PMs usually assemble a bid from emails, RFPs, meeting notes, req
 - Phased timeline and deliverables
 - Effort and cost from your rate card, plus contingency
 - Assumptions, risks, open questions, and next steps
+- Retrieved studio memory (past proposals and logged mistakes)
+
+## RAG loop
+
+1. Finished proposals and logged mistakes are **chunked**.
+2. Each chunk is **embedded** with Gemini `text-embedding-004`.
+3. Vectors live in `data/rag/index.json`.
+4. A new brief is embedded as a **query**.
+5. The closest chunks are **retrieved** and passed into draft + review.
+
+Log a mistake from a draft or on **Studio memory**. The next similar bid has to apply it.
 
 ## Setup
 
 ```bash
 cp .env.example .env.local
-# add OPENAI_API_KEY
+# add GEMINI_API_KEY from https://aistudio.google.com/apikey
 npm install
 npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000).
 
-Optional: set `OPENAI_MODEL` (default `gpt-4o`).
+Gemini 3.6 Flash via the Interactions API. Optional fallback: `OPENAI_API_KEY`.
 
 ## How to use it
 
 1. Edit **Studio profile** with your company name, stack, and rates.
-2. On **New proposal**, upload files or paste text. Tag each source (RFP, email, notes, …).
-3. Or load the sample Meridian Health brief, or open **View sample proposal** to see a finished draft without an API key.
-4. Generate. The agent runs three passes: extract → draft → review.
-5. Export Markdown or Print / PDF from the draft.
-
-Sources and the latest proposal are stored in the browser. The OpenAI key stays on the server in `.env.local`.
-
-## Agent pipeline
-
-1. **Ingest** — PDF, Word, and text extraction
-2. **Extract** — structured brief (goals, must-haves, constraints, unknowns)
-3. **Draft** — proposal grounded in your profile and the brief
-4. **Review** — a second pass that tightens numbers, exclusions, and risks
+2. On **New proposal**, upload files or paste text.
+3. Or load the sample Meridian Health brief, or open **View sample proposal**.
+4. Generate. Pipeline: ingest → extract → RAG retrieve → draft → review.
+5. On the draft, log what went wrong so the vector store learns.
+6. Export Markdown or Print / PDF.

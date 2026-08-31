@@ -1,3 +1,28 @@
+export type ProjectType = "web" | "mobile" | "data" | "integration";
+
+export type BidOutcome = "draft" | "sent" | "won" | "lost" | "no_bid";
+
+export interface EstimateBands {
+  leanHours: number;
+  leanCost: number;
+  likelyHours: number;
+  likelyCost: number;
+  paddedHours: number;
+  paddedCost: number;
+}
+
+export interface BidComparable {
+  id: string;
+  projectTitle: string;
+  clientName: string;
+  projectType: ProjectType;
+  quotedHours: number;
+  quotedCost: number;
+  actualHours?: number;
+  outcome: BidOutcome;
+  note: string;
+}
+
 export type SourceKind =
   | "email"
   | "rfp"
@@ -69,6 +94,36 @@ export interface Risk {
   mitigation: string;
 }
 
+export type LessonCategory =
+  | "scope"
+  | "estimate"
+  | "timeline"
+  | "risk"
+  | "assumption"
+  | "wording"
+  | "other";
+
+export interface Lesson {
+  id: string;
+  createdAt: string;
+  proposalId?: string;
+  projectTitle?: string;
+  category: LessonCategory;
+  mistake: string;
+  correction: string;
+}
+
+export interface ProposalMemory {
+  id: string;
+  createdAt: string;
+  clientName: string;
+  projectTitle: string;
+  problem: string;
+  totalCost: number;
+  totalHours: number;
+  mustHave: string[];
+}
+
 export interface Proposal {
   id: string;
   createdAt: string;
@@ -90,11 +145,30 @@ export interface Proposal {
   openQuestions: string[];
   nextSteps: string[];
   brief: RequirementBrief;
+  projectType?: ProjectType;
+  estimateBands?: EstimateBands;
+  leanCuts?: string[];
+  paddedAdds?: string[];
+  weekOneNeeds?: string[];
+  comparables?: BidComparable[];
+  outcome?: BidOutcome;
+  outcomeNote?: string;
+  actualHours?: number;
+  actualCost?: number;
+  appliedLessonIds?: string[];
+  retrievedMemory?: {
+    id: string;
+    title: string;
+    sourceType: "lesson" | "proposal";
+    text: string;
+    score: number;
+  }[];
 }
 
 export type AgentStepId =
   | "ingest"
   | "extract"
+  | "learn"
   | "scope"
   | "estimate"
   | "draft"
