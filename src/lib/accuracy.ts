@@ -44,6 +44,26 @@ export function ratesForType(
   return { ...company, rates: [...company.rates, ...extras] };
 }
 
+export function rollupEstimates(
+  estimates: { role: string; hours: number; rate: number; cost: number }[],
+  contingencyPct: number,
+) {
+  const lines = estimates.map((row) => {
+    const hours = Math.max(0, Math.round(row.hours));
+    const rate = Math.max(0, row.rate);
+    return { role: row.role, hours, rate, cost: hours * rate };
+  });
+  const subtotal = lines.reduce((sum, row) => sum + row.cost, 0);
+  const totalHours = lines.reduce((sum, row) => sum + row.hours, 0);
+  const totalCost = Math.round(subtotal * (1 + contingencyPct / 100));
+  return {
+    lines,
+    totalHours,
+    totalCost,
+    estimateBands: computeBands(totalHours, totalCost),
+  };
+}
+
 export function computeBands(
   likelyHours: number,
   likelyCost: number,

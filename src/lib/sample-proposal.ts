@@ -285,4 +285,32 @@ export const SAMPLE_PROPOSAL: Proposal = {
     },
   ],
   outcome: "draft",
+  reviewStatus: "internal_review",
+  language: "en",
+  comments: [
+    {
+      id: "c-scope-payments",
+      sectionId: "scope",
+      author: "Priya (sales)",
+      body: "Board will not fund Stripe in v1. Move payments out of included scope before we send.",
+      createdAt: "2026-08-21T11:00:00.000Z",
+      resolved: false,
+    },
+    {
+      id: "c-price-band",
+      sectionId: "investment",
+      author: "James (PM)",
+      body: "We're at the top of the $180–260k band. Confirm the lean cut (drop payments) before internal review signs off.",
+      createdAt: "2026-08-21T11:20:00.000Z",
+      resolved: false,
+    },
+    {
+      id: "c-risk-cal",
+      sectionId: "risks",
+      author: "Dana (delivery)",
+      body: "Calendar dual-run needs to stay a named risk. Do not bury it in assumptions.",
+      createdAt: "2026-08-21T12:00:00.000Z",
+      resolved: true,
+    },
+  ],
 };

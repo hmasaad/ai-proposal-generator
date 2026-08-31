@@ -2,6 +2,42 @@ export type ProjectType = "web" | "mobile" | "data" | "integration";
 
 export type BidOutcome = "draft" | "sent" | "won" | "lost" | "no_bid";
 
+export type ReviewStatus = "draft" | "internal_review" | "client_ready";
+
+export type OutputLanguage = "en" | "ur" | "bilingual" | "ar" | "es";
+
+export type ProposalSectionId =
+  | "summary"
+  | "understanding"
+  | "approach"
+  | "scope"
+  | "deliverables"
+  | "timeline"
+  | "investment"
+  | "assumptions"
+  | "risks"
+  | "questions"
+  | "weekOne"
+  | "next";
+
+export interface SectionComment {
+  id: string;
+  sectionId: ProposalSectionId;
+  author: string;
+  body: string;
+  createdAt: string;
+  resolved: boolean;
+}
+
+export interface ProposalVersion {
+  id: string;
+  createdAt: string;
+  label: string;
+  language: OutputLanguage;
+  status: ReviewStatus;
+  snapshot: Proposal;
+}
+
 export interface EstimateBands {
   leanHours: number;
   leanCost: number;
@@ -156,6 +192,10 @@ export interface Proposal {
   actualHours?: number;
   actualCost?: number;
   appliedLessonIds?: string[];
+  reviewStatus?: ReviewStatus;
+  language?: OutputLanguage;
+  comments?: SectionComment[];
+  updatedAt?: string;
   retrievedMemory?: {
     id: string;
     title: string;

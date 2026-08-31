@@ -1,6 +1,7 @@
 import {
   computeBands,
   ratesForType,
+  rollupEstimates,
   similarBids,
   weekOneNeeds,
 } from "./accuracy";
@@ -15,9 +16,13 @@ import {
   DRAFT_SYSTEM,
   EXTRACT_SYSTEM,
   REVIEW_SYSTEM,
+  REVISE_SYSTEM,
+  TRANSLATE_SYSTEM,
   draftPrompt,
   extractPrompt,
   reviewPrompt,
+  revisePrompt,
+  translatePrompt,
 } from "./prompts";
 import { indexProposal, retrieveContext } from "./rag/retrieve";
 import type {
@@ -25,10 +30,18 @@ import type {
   BidComparable,
   CompanyProfile,
   Lesson,
+  OutputLanguage,
   ProjectType,
   Proposal,
+  ProposalSectionId,
   SourceDocument,
 } from "./types";
+import {
+  formatCommentsForPrompt,
+  languageMeta,
+  mergeGeneratedSections,
+  sectionLabels,
+} from "./workflow";
 
 export type AgentEvent =
   | { type: "step"; step: AgentStepEvent }
@@ -39,16 +52,12 @@ function totals(
   estimates: { role: string; hours: number; rate: number; cost: number }[],
   contingencyPct: number,
 ) {
-  const lines = estimates.map((row) => ({
-    role: row.role,
-    hours: Math.max(0, Math.round(row.hours)),
-    rate: Math.max(0, row.rate),
-    cost: Math.max(0, Math.round(row.hours) * row.rate),
-  }));
-  const subtotal = lines.reduce((sum, row) => sum + row.cost, 0);
-  const totalHours = lines.reduce((sum, row) => sum + row.hours, 0);
-  const totalCost = Math.round(subtotal * (1 + contingencyPct / 100));
-  return { lines, totalHours, totalCost };
+  const rolled = rollupEstimates(estimates, contingencyPct);
+  return {
+    lines: rolled.lines,
+    totalHours: rolled.totalHours,
+    totalCost: rolled.totalCost,
+  };
 }
 
 export async function runProposalAgent(input: {
@@ -213,6 +222,9 @@ export async function runProposalAgent(input: {
     ),
     comparables,
     outcome: "draft",
+    reviewStatus: "draft",
+    language: "en",
+    comments: [],
     appliedLessonIds: memory
       .filter((hit) => hit.sourceType === "lesson")
       .map((hit) => hit.sourceId),
@@ -229,4 +241,105 @@ export async function runProposalAgent(input: {
 
   onEvent({ type: "proposal", proposal });
   return proposal;
+}
+
+function generatedAsProposal(
+  draft: Proposal,
+  current: Proposal,
+): Proposal {
+  const rolled = rollupEstimates(draft.estimates, draft.contingencyPct);
+  return {
+    ...current,
+    clientName: draft.clientName,
+    projectTitle: draft.projectTitle,
+    executiveSummary: draft.executiveSummary,
+    understanding: draft.understanding,
+    approach: draft.approach,
+    scope: draft.scope,
+    deliverables: draft.deliverables,
+    phases: draft.phases,
+    estimates: rolled.lines,
+    totalHours: rolled.totalHours,
+    totalCost: rolled.totalCost,
+    contingencyPct: draft.contingencyPct,
+    timelineSummary: draft.timelineSummary,
+    assumptions: draft.assumptions,
+    risks: draft.risks,
+    openQuestions: draft.openQuestions,
+    nextSteps: draft.nextSteps,
+    estimateBands: rolled.estimateBands,
+    leanCuts: draft.leanCuts ?? current.leanCuts,
+    paddedAdds: draft.paddedAdds ?? current.paddedAdds,
+    weekOneNeeds: draft.weekOneNeeds ?? current.weekOneNeeds,
+  };
+}
+
+export async function reviseProposalSections(input: {
+  proposal: Proposal;
+  company: CompanyProfile;
+  sections: ProposalSectionId[];
+  instruction?: string;
+  language?: OutputLanguage;
+}) {
+  if (!input.sections.length) {
+    throw new Error("Mark at least one section to regenerate.");
+  }
+
+  const language = languageMeta(input.language ?? input.proposal.language);
+  const drafted = await generateStructured({
+    schema: proposalDraftSchema,
+    jsonSchema: proposalDraftJsonSchema,
+    system: REVISE_SYSTEM,
+    prompt: revisePrompt({
+      company: input.company,
+      proposalJson: JSON.stringify(input.proposal, null, 2),
+      sections: sectionLabels(input.sections),
+      instruction: input.instruction?.trim() ?? "",
+      comments: formatCommentsForPrompt(input.proposal.comments ?? []),
+      languageNote: language.instruction,
+    }),
+  });
+
+  const generated = generatedAsProposal(drafted.object as Proposal, input.proposal);
+  return mergeGeneratedSections(input.proposal, generated, input.sections);
+}
+
+export async function translateProposal(input: {
+  proposal: Proposal;
+  language: OutputLanguage;
+}) {
+  const language = languageMeta(input.language);
+  const drafted = await generateStructured({
+    schema: proposalDraftSchema,
+    jsonSchema: proposalDraftJsonSchema,
+    system: TRANSLATE_SYSTEM,
+    prompt: translatePrompt({
+      proposalJson: JSON.stringify(input.proposal, null, 2),
+      languageNote: language.instruction,
+    }),
+  });
+
+  const generated = generatedAsProposal(drafted.object as Proposal, input.proposal);
+  const next = mergeGeneratedSections(
+    input.proposal,
+    generated,
+    [
+      "summary",
+      "understanding",
+      "approach",
+      "scope",
+      "deliverables",
+      "timeline",
+      "investment",
+      "assumptions",
+      "risks",
+      "questions",
+      "weekOne",
+      "next",
+    ],
+  );
+  next.language = input.language;
+  next.reviewStatus =
+    next.reviewStatus === "client_ready" ? "internal_review" : next.reviewStatus;
+  return next;
 }

@@ -1,5 +1,12 @@
 import { proposalToComparable } from "./accuracy";
-import type { BidComparable, CompanyProfile, Lesson, Proposal } from "./types";
+import { makeVersion } from "./workflow";
+import type {
+  BidComparable,
+  CompanyProfile,
+  Lesson,
+  Proposal,
+  ProposalVersion,
+} from "./types";
 import { DEFAULT_COMPANY, SAMPLE_PAST_BIDS, STORAGE_KEYS } from "./defaults";
 import { SAMPLE_LESSONS } from "./sample-lessons";
 
@@ -25,9 +32,10 @@ export function loadProposal(): Proposal | null {
   return readJson<Proposal>(STORAGE_KEYS.proposal);
 }
 
-export function saveProposal(proposal: Proposal) {
+export function saveProposal(proposal: Proposal, options?: { index?: boolean }) {
   window.localStorage.setItem(STORAGE_KEYS.proposal, JSON.stringify(proposal));
   upsertHistory(proposalToComparable(proposal));
+  if (options?.index === false) return;
   void fetch("/api/rag/index", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -74,5 +82,31 @@ export function addLesson(lesson: Lesson) {
 export function removeLesson(id: string) {
   const next = loadLessons().filter((item) => item.id !== id);
   saveLessons(next);
+  return next;
+}
+
+export function loadAuthor() {
+  if (typeof window === "undefined") return "You";
+  return window.localStorage.getItem(STORAGE_KEYS.author)?.trim() || "You";
+}
+
+export function saveAuthor(name: string) {
+  window.localStorage.setItem(STORAGE_KEYS.author, name.trim() || "You");
+}
+
+export function loadVersions(proposalId: string): ProposalVersion[] {
+  const all = readJson<Record<string, ProposalVersion[]>>(STORAGE_KEYS.versions) ?? {};
+  return all[proposalId] ?? [];
+}
+
+export function saveVersions(proposalId: string, versions: ProposalVersion[]) {
+  const all = readJson<Record<string, ProposalVersion[]>>(STORAGE_KEYS.versions) ?? {};
+  all[proposalId] = versions.slice(0, 12);
+  window.localStorage.setItem(STORAGE_KEYS.versions, JSON.stringify(all));
+}
+
+export function pushVersion(proposal: Proposal, label: string) {
+  const next = [makeVersion(proposal, label), ...loadVersions(proposal.id)];
+  saveVersions(proposal.id, next);
   return next;
 }

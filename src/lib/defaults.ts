@@ -33,6 +33,8 @@ export const STORAGE_KEYS = {
   proposal: "proposal-agent:latest",
   lessons: "proposal-agent:lessons",
   history: "proposal-agent:history",
+  versions: "proposal-agent:versions",
+  author: "proposal-agent:author",
 } as const;
 
 export const PROJECT_TYPES: {

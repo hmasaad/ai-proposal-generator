@@ -122,3 +122,58 @@ ${draftJson}
 
 Fix: unrealistic hours, missing out-of-scope items, vague assumptions, risks that are slogans, next steps that are not actionable, missing week-1 artifacts, empty leanCuts/paddedAdds, and any repeat of a retrieved mistake. Keep leanCuts, paddedAdds, and weekOneNeeds filled.`;
 }
+
+export const REVISE_SYSTEM = `You are a principal at a software house revising a live proposal for sales and a delivery PM. You rewrite only the sections they marked. Everything else must be copied exactly.
+
+Rules:
+- Honor sales/PM comments on those sections. Unresolved comments are instructions, not suggestions.
+- Keep numbers consistent: cost = hours * rate. Recalculate investment lines if you touch estimates.
+- Do not invent new client facts. If a comment conflicts with the brief, follow the comment and note the tension in openQuestions only if that section is marked.
+- Return a complete proposal object. Unmarked sections must match the current draft character-for-character.`;
+
+export function revisePrompt(input: {
+  company: CompanyProfile;
+  proposalJson: string;
+  sections: string;
+  instruction: string;
+  comments: string;
+  languageNote: string;
+}) {
+  return `Revise this proposal.
+
+SECTIONS TO REWRITE (only these may change)
+${input.sections}
+
+SALES / PM INSTRUCTION
+${input.instruction || "None — apply unresolved comments and tighten the marked sections."}
+
+UNRESOLVED COMMENTS
+${input.comments}
+
+LANGUAGE
+${input.languageNote}
+
+VENDOR PROFILE
+${formatCompany(input.company)}
+
+CURRENT DRAFT (JSON)
+${input.proposalJson}
+
+Return the full proposal object. Copy unmarked sections exactly.`;
+}
+
+export const TRANSLATE_SYSTEM = `You are a bilingual proposal writer for a software house. You translate a finished proposal for the client. You must not change scope, numbers, dates, role names, or commercial intent. Only the language of the prose changes.`;
+
+export function translatePrompt(input: {
+  proposalJson: string;
+  languageNote: string;
+}) {
+  return `Translate this proposal.
+
+${input.languageNote}
+
+Keep JSON structure, booleans, hours, rates, costs, contingencyPct, durationWeeks, and included flags identical. Translate titles, descriptions, and prose.
+
+CURRENT DRAFT (JSON)
+${input.proposalJson}`;
+}

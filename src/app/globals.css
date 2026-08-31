@@ -28,8 +28,12 @@ body {
   background: #cfe0d4;
 }
 
-.prose-proposal p + p {
-  margin-top: 0.9em;
+.font-urdu {
+  font-family: var(--font-urdu), var(--font-sans);
+}
+
+.font-arabic {
+  font-family: var(--font-arabic), var(--font-sans);
 }
 
 @media print {
