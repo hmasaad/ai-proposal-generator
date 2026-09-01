@@ -1,5 +1,6 @@
 import { attachValidation } from "./eval";
 import { SAMPLE_PAST_BIDS } from "./defaults";
+import { attachProposalQuality } from "./proposal-quality";
 import type {
   BidComparable,
   CompanyProfile,
@@ -213,7 +214,11 @@ export function withStudioChecks(
   extra?: { sources?: SourceDocument[]; history?: BidComparable[] },
 ): Proposal {
   return attachValidation(
-    attachWinProbability(proposal, company, extra?.history),
+    attachProposalQuality(
+      attachWinProbability(proposal, company, extra?.history),
+      company,
+      extra?.sources,
+    ),
     company,
     extra?.sources,
   );

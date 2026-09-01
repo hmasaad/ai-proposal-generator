@@ -8,6 +8,7 @@ import type {
   ProjectType,
   Proposal,
 } from "./types";
+import { reasonLabel } from "./feedback";
 
 export const LEAN_RATIO = 0.82;
 export const PADDED_RATIO = 1.22;
@@ -164,6 +165,7 @@ export function proposalToComparable(proposal: Proposal): BidComparable {
     quotedCost: proposal.totalCost,
     actualHours: proposal.actualHours,
     outcome: proposal.outcome ?? "draft",
+    reason: proposal.outcomeReason,
     note:
       proposal.outcomeNote?.trim() ||
       (proposal.comparables?.[0]?.note ?? ""),
@@ -179,6 +181,7 @@ export function outcomeLesson(proposal: Proposal): Lesson | null {
     ? `${proposal.actualHours} hours`
     : "actuals not recorded";
   const note = proposal.outcomeNote?.trim();
+  const why = proposal.outcomeReason ? ` Reason: ${reasonLabel(proposal.outcomeReason)}.` : "";
 
   if (outcome === "won") {
     return {
@@ -186,10 +189,10 @@ export function outcomeLesson(proposal: Proposal): Lesson | null {
       createdAt: new Date().toISOString(),
       proposalId: proposal.id,
       projectTitle: proposal.projectTitle,
-      category: "estimate",
+      category: proposal.outcomeReason === "timeline" ? "timeline" : "estimate",
       mistake: note
-        ? `Won ${proposal.projectTitle}. Quoted ${quoted}; delivery note: ${note}`
-        : `Won ${proposal.projectTitle} at ${quoted} (${actual}).`,
+        ? `Won ${proposal.projectTitle}. Quoted ${quoted}; delivery note: ${note}.${why}`
+        : `Won ${proposal.projectTitle} at ${quoted} (${actual}).${why}`,
       correction: proposal.actualHours
         ? `Next similar ${proposal.projectType ?? "web"} bid: quoted ${proposal.totalHours}h, actual ${proposal.actualHours}h. Scale hours toward actuals and keep the week-1 artifacts that this job needed.`
         : `Keep the week-1 checklist and exclusions that let this bid close. Record actual hours when the job ends.`,
@@ -201,10 +204,15 @@ export function outcomeLesson(proposal: Proposal): Lesson | null {
     createdAt: new Date().toISOString(),
     proposalId: proposal.id,
     projectTitle: proposal.projectTitle,
-    category: "estimate",
+    category:
+      proposal.outcomeReason === "compliance"
+        ? "scope"
+        : proposal.outcomeReason === "timeline"
+          ? "timeline"
+          : "estimate",
     mistake: note
-      ? `Lost ${proposal.projectTitle} (${quoted}). ${note}`
-      : `Lost ${proposal.projectTitle} at ${quoted}.`,
+      ? `Lost ${proposal.projectTitle} (${quoted}). ${note}.${why}`
+      : `Lost ${proposal.projectTitle} at ${quoted}.${why}`,
     correction:
       note ||
       "For similar briefs, check price vs. the client's band, drop nice-to-haves into a later phase, and keep compliance exclusions explicit.",
@@ -216,7 +224,7 @@ export function formatPastBids(history: BidComparable[]) {
   return history
     .map(
       (item) =>
-        `- [${item.outcome}] ${item.projectTitle} (${item.clientName}, ${item.projectType}): quoted ${item.quotedHours}h / ${item.quotedCost}${item.actualHours ? `, actual ${item.actualHours}h` : ""}. ${item.note}`,
+        `- [${item.outcome}${item.reason ? `/${item.reason}` : ""}] ${item.projectTitle} (${item.clientName}, ${item.projectType}): quoted ${item.quotedHours}h / ${item.quotedCost}${item.actualHours ? `, actual ${item.actualHours}h` : ""}. ${item.note}`,
     )
     .join("\n");
 }

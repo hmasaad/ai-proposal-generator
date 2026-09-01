@@ -5,7 +5,7 @@ import { loadStudio, patchStudio } from "@/lib/studio-store";
 import { indexKnowledge, indexLessons, indexProposal } from "@/lib/rag/retrieve";
 import { removeSource } from "@/lib/rag/store";
 import { proposalToComparable } from "@/lib/accuracy";
-import { DEFAULT_COMPANY } from "@/lib/defaults";
+import { DEFAULT_COMPANY, SAMPLE_PAST_BIDS } from "@/lib/defaults";
 import type { CompanyProfile, KnowledgeDoc, Lesson, Proposal } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -34,7 +34,9 @@ export async function PUT(request: Request) {
       sent?: boolean;
     };
 
+    let previousProposal: Proposal | null = null;
     const studio = await patchStudio((current) => {
+      previousProposal = current.latestProposal;
       let next = { ...current };
 
       if (body.company) {
@@ -87,10 +89,21 @@ export async function PUT(request: Request) {
       if (body.proposal) {
         next.latestProposal = body.proposal;
         const comparable = proposalToComparable(body.proposal);
-        next.history = [comparable, ...next.history.filter((item) => item.id !== comparable.id)].slice(
-          0,
-          50,
-        );
+        const decided = comparable.outcome === "won" || comparable.outcome === "lost";
+        const readyToStore =
+          comparable.outcome === "sent" ||
+          comparable.outcome === "no_bid" ||
+          (decided && Boolean(comparable.reason));
+        const seedIds = new Set(SAMPLE_PAST_BIDS.map((item) => item.id));
+        const exists = next.history.some((item) => item.id === comparable.id);
+        if (readyToStore) {
+          next.history = [
+            comparable,
+            ...next.history.filter((item) => item.id !== comparable.id),
+          ].slice(0, 50);
+        } else if (exists && !seedIds.has(comparable.id)) {
+          next.history = next.history.filter((item) => item.id !== comparable.id);
+        }
       }
 
       return next;
@@ -115,6 +128,27 @@ export async function PUT(request: Request) {
     }
     if (body.proposal) {
       await indexProposal(body.proposal).catch(() => undefined);
+      const prev = previousProposal;
+      const closed =
+        body.proposal.outcome === "won" ||
+        body.proposal.outcome === "lost" ||
+        body.proposal.outcome === "no_bid";
+      if (
+        closed &&
+        (body.proposal.outcome !== prev?.outcome ||
+          body.proposal.outcomeReason !== prev?.outcomeReason ||
+          body.proposal.outcomeNote !== prev?.outcomeNote)
+      ) {
+        await recordAudit(
+          user,
+          "outcome",
+          `${body.proposal.outcome}${body.proposal.outcomeReason ? ` · ${body.proposal.outcomeReason}` : ""}: ${body.proposal.projectTitle}`,
+          {
+            proposalId: body.proposal.id,
+            projectTitle: body.proposal.projectTitle,
+          },
+        );
+      }
     }
     if (body.sent && body.proposal) {
       await recordAudit(user, "send", `Marked sent: ${body.proposal.projectTitle}`, {

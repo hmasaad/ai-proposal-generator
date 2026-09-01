@@ -32,6 +32,18 @@ function withLock<T>(fn: () => Promise<T>): Promise<T> {
   return next;
 }
 
+function mergeHistory(stored?: BidComparable[]) {
+  const list = stored?.length ? stored : [];
+  const seedById = new Map(SAMPLE_PAST_BIDS.map((item) => [item.id, item]));
+  const ids = new Set(list.map((item) => item.id));
+  const hydrated = list.map((item) => {
+    const seed = seedById.get(item.id);
+    if (!seed) return item;
+    return { ...seed, ...item, reason: item.reason ?? seed.reason };
+  });
+  return [...hydrated, ...SAMPLE_PAST_BIDS.filter((item) => !ids.has(item.id))];
+}
+
 function seed(): StudioState {
   return {
     company: { ...DEFAULT_COMPANY, rates: [...DEFAULT_COMPANY.rates] },
@@ -51,7 +63,7 @@ async function readStore(): Promise<StudioState> {
       company: { ...base.company, ...(parsed.company ?? {}) },
       lessons: parsed.lessons?.length ? parsed.lessons : base.lessons,
       knowledge: parsed.knowledge?.length ? parsed.knowledge : base.knowledge,
-      history: parsed.history?.length ? parsed.history : base.history,
+      history: mergeHistory(parsed.history),
       latestProposal: parsed.latestProposal ?? null,
     };
   } catch {

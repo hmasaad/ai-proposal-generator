@@ -126,7 +126,7 @@ Rules:
 - Use only roles on the vendor rate card. Copy role names exactly. cost = hours * rate. Whole hours.
 - Include PM, design, engineering, and QA when those roles exist on the card, plus any staffing roles from the outline.
 - Do not price excluded scope. Discovery of an unknown integration is its own line of hours, not a two-day add-on.
-- Honor past bids: if a similar job overran, do not bid the same integration as a side task.
+- Honor past bids: if a similar job overran, do not bid the same integration as a side task. Outcome tags look like [lost/compliance] — do not repeat that failure mode.
 - contingencyPct defaults to the vendor value unless the risk profile warrants more (cap 25).
 - leanCuts: 3–6 concrete cuts for an ~18% smaller bid (scope that would actually come out).
 - paddedAdds: 3–6 specific unknowns that justify ~22% more hours.`;

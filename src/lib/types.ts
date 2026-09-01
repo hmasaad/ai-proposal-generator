@@ -2,6 +2,18 @@ export type ProjectType = "web" | "mobile" | "data" | "integration";
 
 export type BidOutcome = "draft" | "sent" | "won" | "lost" | "no_bid";
 
+export type OutcomeReason =
+  | "price"
+  | "timeline"
+  | "scope"
+  | "technical_fit"
+  | "incumbent"
+  | "relationship"
+  | "compliance"
+  | "delivery_risk"
+  | "no_budget"
+  | "other";
+
 export type ReviewStatus = "draft" | "internal_review" | "client_ready";
 
 export type OutputLanguage = "en" | "ur" | "bilingual" | "ar" | "es";
@@ -57,6 +69,7 @@ export interface BidComparable {
   actualHours?: number;
   outcome: BidOutcome;
   note: string;
+  reason?: OutcomeReason;
 }
 
 export type SourceKind =
@@ -305,7 +318,9 @@ export interface Proposal {
   weekOneNeeds?: string[];
   comparables?: BidComparable[];
   outcome?: BidOutcome;
+  outcomeReason?: OutcomeReason;
   outcomeNote?: string;
+  outcomeRecordedAt?: string;
   actualHours?: number;
   actualCost?: number;
   appliedLessonIds?: string[];
@@ -324,6 +339,28 @@ export interface Proposal {
   }[];
   validation?: ValidationReport;
   winProbability?: WinProbability;
+  proposalQuality?: ProposalQuality;
+}
+
+export type QualityGate = "pass" | "warning" | "fail";
+
+export interface QualityGap {
+  id: string;
+  label: string;
+  detail: string;
+}
+
+export interface ProposalQuality {
+  coveragePct: number;
+  coveredCount: number;
+  totalCount: number;
+  missing: QualityGap[];
+  unsupportedClaims: number;
+  unsupportedDetail: string;
+  pricing: QualityGate;
+  pricingDetail: string;
+  timeline: QualityGate;
+  timelineDetail: string;
 }
 
 export type WinPolarity = "positive" | "negative";
@@ -401,7 +438,8 @@ export type AuditAction =
   | "lock_rates"
   | "unlock_rates"
   | "save_profile"
-  | "invite_user";
+  | "invite_user"
+  | "outcome";
 
 export interface AuditEvent {
   id: string;

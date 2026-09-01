@@ -336,6 +336,7 @@ export const SAMPLE_PROPOSAL: Proposal = {
       quotedCost: 118000,
       actualHours: 980,
       outcome: "won",
+      reason: "technical_fit",
       note: "Quoted calendar import as 2 days. Three Google Calendars; dual-run ate a week. Next time: sample file in week 1, migration as its own phase.",
     },
     {
@@ -346,6 +347,7 @@ export const SAMPLE_PROPOSAL: Proposal = {
       quotedHours: 410,
       quotedCost: 64000,
       outcome: "lost",
+      reason: "compliance",
       note: "SMS with visit reason. Compliance killed the SOW after signature on a similar deal. Keep SMS non-PHI.",
     },
     {
@@ -357,6 +359,7 @@ export const SAMPLE_PROPOSAL: Proposal = {
       quotedCost: 248000,
       actualHours: 1540,
       outcome: "won",
+      reason: "scope",
       note: "Bid the full wish list against a known budget and almost lost. Cut payments from v1; booking held.",
     },
   ],

@@ -28,10 +28,13 @@ import {
   hydrateStudio,
 } from "@/lib/storage";
 import { formatDate, formatDateTime, money, newId } from "@/lib/format";
+import { OutcomePanel } from "@/components/FeedbackLoop";
 import { outcomeLesson, projectTypeLabel } from "@/lib/accuracy";
+import { isClosedOutcome } from "@/lib/feedback";
 import { withStudioChecks } from "@/lib/win-probability";
 import { ValidationReportCard } from "@/components/ValidationReport";
 import { WinProbabilityCard } from "@/components/WinProbability";
+import { ProposalQualityCard } from "@/components/ProposalQuality";
 import { diffProposals } from "@/lib/proposal-diff";
 import { printClientPack } from "@/lib/export-pack";
 import {
@@ -44,7 +47,6 @@ import {
   unresolvedComments,
 } from "@/lib/workflow";
 import type {
-  BidOutcome,
   CompanyProfile,
   OutputLanguage,
   Proposal,
@@ -105,10 +107,21 @@ export default function ProposalPage() {
     if (checkpoint && proposal) {
       setVersions(pushVersion(proposal, checkpoint));
     }
+    const readyToStore =
+      checked.outcome === "no_bid" ||
+      ((checked.outcome === "won" || checked.outcome === "lost") &&
+        Boolean(checked.outcomeReason));
+    const previouslyTracked =
+      proposal != null &&
+      (proposal.outcome === "sent" || isClosedOutcome(proposal.outcome));
     setProposal(checked);
     saveProposal(checked, {
-      index: Boolean(checkpoint),
-      share: Boolean(checkpoint) || checked.outcome === "sent" || checked.outcome === "won",
+      index: Boolean(checkpoint) || readyToStore || checked.outcome === "sent",
+      share:
+        Boolean(checkpoint) ||
+        readyToStore ||
+        checked.outcome === "sent" ||
+        previouslyTracked,
       sent: checked.outcome === "sent" && proposal?.outcome !== "sent",
     });
   }
@@ -163,6 +176,7 @@ export default function ProposalPage() {
         id: proposal.id,
         comments: proposal.comments,
         outcome: proposal.outcome,
+        outcomeReason: proposal.outcomeReason,
         outcomeNote: proposal.outcomeNote,
         actualHours: proposal.actualHours,
         actualCost: proposal.actualCost,
@@ -266,6 +280,15 @@ export default function ProposalPage() {
                   {openComments.length === 1
                     ? "1 open comment on scope / price / risks."
                     : `${openComments.length} open comments on scope / price / risks.`}
+                </p>
+              )}
+              {proposal.proposalQuality && (
+                <p className="mt-2 text-xs leading-5 text-ink-soft">
+                  Quality {proposal.proposalQuality.coveragePct}% coverage
+                  {proposal.proposalQuality.timeline === "warning"
+                    ? " · timeline warning"
+                    : ""}
+                  {proposal.proposalQuality.pricing === "fail" ? " · pricing fail" : ""}.
                 </p>
               )}
             </div>
@@ -520,13 +543,17 @@ export default function ProposalPage() {
           <OutcomePanel
             proposal={proposal}
             currency={company.currency}
-            onChange={(next, writeLesson) => {
+            historyCount={loadHistory().length}
+            onChange={(next, store) => {
               persist(next);
-              if (!writeLesson) return;
+              if (!store) return;
               const lesson = outcomeLesson(next);
               if (lesson) addLesson(lesson);
             }}
           />
+          {proposal.proposalQuality && (
+            <ProposalQualityCard report={proposal.proposalQuality} />
+          )}
           {proposal.winProbability && <WinProbabilityCard report={proposal.winProbability} />}
           {proposal.validation && <ValidationReportCard report={proposal.validation} />}
           {proposal.rfpScore && <RfpScorecard score={proposal.rfpScore} />}
@@ -586,119 +613,3 @@ export default function ProposalPage() {
   );
 }
 
-const OUTCOMES: { id: BidOutcome; label: string }[] = [
-  { id: "draft", label: "Draft" },
-  { id: "sent", label: "Sent" },
-  { id: "won", label: "Won" },
-  { id: "lost", label: "Lost" },
-  { id: "no_bid", label: "No bid" },
-];
-
-function OutcomePanel({
-  proposal,
-  currency,
-  onChange,
-}: {
-  proposal: Proposal;
-  currency: string;
-  onChange: (next: Proposal, writeLesson: boolean) => void;
-}) {
-  const outcome = proposal.outcome ?? "draft";
-
-  return (
-    <section className="no-print mt-8 rounded-3xl border border-rule bg-white/50 p-5">
-      <h2 className="font-serif text-xl">Win / loss</h2>
-      <p className="mt-1 text-sm text-ink-soft">
-        Tag the outcome so the next similar bid retrieves it. Won or lost writes a lesson into studio
-        memory.
-      </p>
-      <div className="mt-4 flex flex-wrap gap-2">
-        {OUTCOMES.map((item) => (
-          <button
-            key={item.id}
-            type="button"
-            onClick={() =>
-              onChange(
-                { ...proposal, outcome: item.id },
-                item.id === "won" || item.id === "lost",
-              )
-            }
-            className={`rounded-full px-3 py-1.5 text-sm ${
-              outcome === item.id ? "bg-forest text-paper" : "border border-rule"
-            }`}
-          >
-            {item.label}
-          </button>
-        ))}
-      </div>
-      <div className="mt-4 grid gap-3 sm:grid-cols-2">
-        <label className="block text-sm">
-          <span className="text-ink-soft">Actual hours (optional)</span>
-          <input
-            type="number"
-            min={0}
-            value={proposal.actualHours ?? ""}
-            onChange={(event) =>
-              onChange(
-                {
-                  ...proposal,
-                  actualHours: event.target.value ? Number(event.target.value) : undefined,
-                },
-                false,
-              )
-            }
-            className="mt-1 w-full rounded-xl border border-rule bg-white/60 px-3 py-2"
-          />
-        </label>
-        <label className="block text-sm">
-          <span className="text-ink-soft">Actual cost ({currency}, optional)</span>
-          <input
-            type="number"
-            min={0}
-            value={proposal.actualCost ?? ""}
-            onChange={(event) =>
-              onChange(
-                {
-                  ...proposal,
-                  actualCost: event.target.value ? Number(event.target.value) : undefined,
-                },
-                false,
-              )
-            }
-            className="mt-1 w-full rounded-xl border border-rule bg-white/60 px-3 py-2"
-          />
-        </label>
-      </div>
-      <label className="mt-3 block text-sm">
-        <span className="text-ink-soft">What to remember next time</span>
-        <textarea
-          rows={3}
-          value={proposal.outcomeNote ?? ""}
-          onChange={(event) =>
-            onChange({ ...proposal, outcomeNote: event.target.value }, false)
-          }
-          placeholder="e.g. Calendar import was quoted as 2 days; dual-run ate a week."
-          className="mt-1 w-full rounded-xl border border-rule bg-white/60 px-3 py-2 leading-relaxed"
-        />
-      </label>
-      {(outcome === "won" || outcome === "lost") && (
-        <button
-          type="button"
-          onClick={() => onChange(proposal, true)}
-          className="mt-3 rounded-full border border-rule px-3 py-1.5 text-sm"
-        >
-          Update studio memory
-        </button>
-      )}
-      {outcome === "won" && (
-        <p className="mt-4 text-sm leading-6">
-          They said yes.{" "}
-          <Link href="/delivery" className="text-forest underline">
-            Open delivery
-          </Link>{" "}
-          for kickoff, RAID, Jira/Linear epics, and change orders from this brief.
-        </p>
-      )}
-    </section>
-  );
-}

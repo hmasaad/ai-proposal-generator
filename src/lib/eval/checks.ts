@@ -22,7 +22,7 @@ function check(
   return { id, label, severity, pass, detail };
 }
 
-function blob(proposal: Proposal) {
+export function blob(proposal: Proposal) {
   return [
     proposal.executiveSummary,
     proposal.understanding,
@@ -54,7 +54,7 @@ function significantWords(text: string) {
     .filter((word) => word.length > 3);
 }
 
-function covered(needle: string, hay: string) {
+export function covered(needle: string, hay: string) {
   const normalizedHay = normalize(hay);
   if (normalizedHay.includes(normalize(needle))) return true;
   const words = significantWords(needle);

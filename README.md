@@ -77,6 +77,31 @@ Scope and price are committed before anyone writes the executive summary, so the
 
 After generate, the draft includes an internal **win probability** (no extra model call). It scores the bid from the RFP scorecard, studio tech stack, similar closed bids, deadline pace, and price vs historical average. Meridian sample: **68%** — strong technical fit, similar clinic work, stack match; aggressive 16-week deadline and price above the similar-bid average.
 
+## Proposal Quality Agent
+
+Before you mark **Client-ready**, a quality pass (also no extra model call) reports:
+
+- **Requirements coverage** of the brief plus delivery-complete topics
+- **Missing** items a delivery director still wants (data migration, SLA, DR on the Meridian sample)
+- **Unsupported claims** (scored-out or excluded work marked included)
+- **Pricing validation** against the locked rate card
+- **Timeline validation** (pace vs stated weeks)
+
+Meridian sample: **94%** coverage, 3 missing, 0 unsupported claims, pricing **PASS**, timeline **WARNING**.
+
+## Feedback loop
+
+After every proposal:
+
+1. **Proposal** — send the draft
+2. **Won / Lost** — tag the outcome
+3. **Reason** — price, timeline, compliance, incumbent, …
+4. **Store outcome** — studio history, a lesson, and the RAG index
+5. **Analytics** — win rate, overrun, loss reasons on **Feedback**
+6. **Improve future proposals** — the next generate retrieves similar outcomes before it prices and writes
+
+That is what makes this an AI-native bid system rather than a document generator. Sample history: 2 won / 1 lost (compliance).
+
 ## Product / ops
 
 Sign in. Studio memory (profile, lessons, knowledge, past bids, RAG) lives on the server in `data/`, so the next person on another browser gets the same studio.
@@ -89,7 +114,7 @@ Demo accounts (password `northline`):
 
 **Roles.** Sales cannot change rates while finance has them locked. Generate always uses the server rate card. Finance opens **Ops** for the audit log and token cost.
 
-**Audit.** Login, generate, revise, translate, send, delivery, knowledge/lesson index, rate lock, profile save, invites.
+**Audit.** Login, generate, revise, translate, send, outcome, delivery, knowledge/lesson index, rate lock, profile save, invites.
 
 **Cost.** Each Gemini call records input / output / thought tokens. Cost uses Gemini 3.6 Flash intro pricing ($0.75 / $3.75 per 1M through Dec 2026). Override with `GEMINI_INPUT_PER_MILLION` and `GEMINI_OUTPUT_PER_MILLION`. Set `AUTH_SECRET` in production.
 
@@ -115,6 +140,7 @@ Free-tier Gemini allows **20 generate requests per day**. One proposal uses seve
 3. On **New proposal**, upload files, paste a Gmail/Outlook thread, or import a Zoom/Meet transcript.
 3. Or load the sample Meridian Health brief, or open **View sample proposal**.
 4. Generate. The **Proposal Writer Agent** outlines scope, prices the likely band, writes the client document, then a reviewer checks it against studio memory. Pipeline: ingest → extract → score → RAG → outline → price → write → review.
-5. On the draft, review the **validation report** and the internal scorecard, then log what went wrong so the vector store learns. Errors must be fixed before **Client-ready**.
-6. Export a **branded PDF** (cover, SOW, commercial appendix, MSA), a **board one-pager**, split SOW/commercial packs, or **Word / Google Docs** (`.docx`). Logo and legal template live on **Studio profile**.
-7. When they say yes, tag **Won** and open **Delivery** for kickoff, RAID, Jira/Linear epics, and change orders.
+5. On the draft, review the **Proposal Quality Agent**, win probability, **validation report**, and the internal scorecard. Errors must be fixed before **Client-ready**. After they decide, tag **Won / Lost** with a reason — that is the **feedback loop**.
+6. Open **Feedback** for win rate, loss reasons, and stored outcomes. The next generate retrieves them (RAG + pricing + win probability).
+7. Export a **branded PDF** (cover, SOW, commercial appendix, MSA), a **board one-pager**, split SOW/commercial packs, or **Word / Google Docs** (`.docx`). Logo and legal template live on **Studio profile**.
+8. When they say yes, tag **Won** and open **Delivery** for kickoff, RAID, Jira/Linear epics, and change orders.

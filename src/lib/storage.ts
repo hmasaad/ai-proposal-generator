@@ -63,7 +63,20 @@ export function saveProposal(
 }
 
 export function loadHistory(): BidComparable[] {
-  return readJson<BidComparable[]>(STORAGE_KEYS.history) ?? SAMPLE_PAST_BIDS;
+  const stored = readJson<BidComparable[]>(STORAGE_KEYS.history);
+  const seedById = new Map(SAMPLE_PAST_BIDS.map((item) => [item.id, item]));
+  const list = stored?.length ? stored : [];
+  const ids = new Set(list.map((item) => item.id));
+  const hydrated = list.map((item) => {
+    const seed = seedById.get(item.id);
+    if (!seed) return item;
+    return { ...seed, ...item, reason: item.reason ?? seed.reason };
+  });
+  const merged = [
+    ...hydrated,
+    ...SAMPLE_PAST_BIDS.filter((item) => !ids.has(item.id)),
+  ];
+  return merged.length ? merged : SAMPLE_PAST_BIDS;
 }
 
 export function saveHistory(history: BidComparable[]) {

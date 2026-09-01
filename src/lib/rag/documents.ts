@@ -27,7 +27,8 @@ export function proposalToChunks(proposal: Proposal): Omit<RagChunk, "embedding"
     ? `Actual hours: ${proposal.actualHours}.`
     : "";
   const note = proposal.outcomeNote ? `Outcome note: ${proposal.outcomeNote}` : "";
-  const header = `${proposal.projectTitle} for ${proposal.clientName}. Type: ${type}. Outcome: ${outcome}. Quoted ${proposal.totalHours}h / ${proposal.totalCost}. ${bands} ${actual} ${note}`;
+  const reason = proposal.outcomeReason ? `Reason: ${proposal.outcomeReason}.` : "";
+  const header = `${proposal.projectTitle} for ${proposal.clientName}. Type: ${type}. Outcome: ${outcome}. ${reason} Quoted ${proposal.totalHours}h / ${proposal.totalCost}. ${bands} ${actual} ${note}`;
   return chunkText(`${header}\n${markdown}`, 900).map((part, index) => ({
     id: `${proposal.id}:${index}`,
     sourceId: proposal.id,
