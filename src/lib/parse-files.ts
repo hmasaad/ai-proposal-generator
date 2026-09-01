@@ -7,6 +7,9 @@ const TEXT_TYPES = new Set([
   "text/csv",
   "application/json",
   "text/html",
+  "text/vtt",
+  "application/x-subrip",
+  "message/rfc822",
 ]);
 
 function ext(name: string) {
@@ -18,9 +21,13 @@ export async function extractFileText(file: File): Promise<string> {
   const type = file.type;
   const extension = ext(name);
 
+  if (extension === "msg") {
+    throw new Error("Outlook .msg files are not supported. Save as .eml or paste the thread.");
+  }
+
   if (
     TEXT_TYPES.has(type) ||
-    ["txt", "md", "csv", "json", "html"].includes(extension)
+    ["txt", "md", "csv", "json", "html", "eml", "vtt", "srt"].includes(extension)
   ) {
     return file.text();
   }
@@ -41,6 +48,6 @@ export async function extractFileText(file: File): Promise<string> {
   }
 
   throw new Error(
-    `Unsupported file type for ${name}. Use PDF, Word, Markdown, or plain text.`,
+    `Unsupported file type for ${name}. Use PDF, Word, Markdown, .eml, .vtt/.srt, or plain text.`,
   );
 }

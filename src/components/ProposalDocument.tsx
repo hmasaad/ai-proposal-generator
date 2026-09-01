@@ -46,6 +46,7 @@ function DraftSection({
   editor,
   children,
   editing,
+  className = "",
 }: {
   id: ProposalSectionId;
   title: string;
@@ -53,6 +54,7 @@ function DraftSection({
   editor?: DraftEditor;
   children: React.ReactNode;
   editing?: React.ReactNode;
+  className?: string;
 }) {
   const meta = PROPOSAL_SECTIONS.find((item) => item.id === id);
   const comments = commentsForSection(proposal, id);
@@ -65,7 +67,7 @@ function DraftSection({
       id={meta?.anchor ?? id}
       className={`scroll-mt-24 border-t border-rule py-8 ${
         marked ? "border-l-2 border-l-forest pl-4" : ""
-      }`}
+      } ${className}`}
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="font-serif text-2xl tracking-tight">{title}</h2>
@@ -128,7 +130,7 @@ export function ProposalDocument({
     <article
       dir={lang.dir}
       lang={htmlLang}
-      className={`print-sheet mx-auto max-w-3xl rounded-3xl border border-rule bg-[#fcfaf6] px-8 py-10 shadow-[0_20px_50px_rgba(28,25,21,0.06)] sm:px-12 ${fontClass}`}
+      className={`print-pack-proposal print-sheet mx-auto max-w-3xl rounded-3xl border border-rule bg-[#fcfaf6] px-8 py-10 shadow-[0_20px_50px_rgba(28,25,21,0.06)] sm:px-12 ${fontClass}`}
     >
       <p className="text-xs uppercase tracking-[0.22em] text-moss">
         Project proposal
@@ -432,6 +434,7 @@ export function ProposalDocument({
         title="Investment"
         proposal={proposal}
         editor={editor}
+        className="print-inline-commercial"
         editing={
           <div className="space-y-3">
             {proposal.estimates.map((row, index) => (

@@ -1,7 +1,8 @@
+import { SAMPLE_KNOWLEDGE } from "@/lib/sample-knowledge";
 import { SAMPLE_LESSONS } from "@/lib/sample-lessons";
 import { SAMPLE_PROPOSAL } from "@/lib/sample-proposal";
-import type { Lesson, Proposal, SourceDocument } from "@/lib/types";
-import { lessonToChunks, proposalToChunks } from "./documents";
+import type { KnowledgeDoc, Lesson, Proposal, SourceDocument } from "@/lib/types";
+import { knowledgeToChunks, lessonToChunks, proposalToChunks } from "./documents";
 import { embedDocument, embedQuery, embeddingsAvailable } from "./embed";
 import { loadChunks, upsertChunks } from "./store";
 import { cosine, type RagChunk, type RetrievedChunk } from "./types";
@@ -21,7 +22,13 @@ async function ensureSeeded() {
   if (!existing.length) {
     await indexLessons(SAMPLE_LESSONS);
     await indexProposal(SAMPLE_PROPOSAL);
+    await indexKnowledge(SAMPLE_KNOWLEDGE);
     return loadChunks();
+  }
+
+  if (!existing.some((chunk) => chunk.sourceType === "knowledge")) {
+    await indexKnowledge(SAMPLE_KNOWLEDGE);
+    existing = await loadChunks();
   }
 
   if (embeddingsAvailable() && existing.some((chunk) => chunk.embedding.length === 0)) {
@@ -71,13 +78,29 @@ export async function indexProposal(proposal: Proposal) {
   await upsertChunks(chunks);
 }
 
+export async function indexKnowledge(docs: KnowledgeDoc[]) {
+  const prepared = docs.flatMap(knowledgeToChunks);
+  const chunks: RagChunk[] = [];
+  for (const part of prepared) {
+    const embedding = embeddingsAvailable()
+      ? await embedDocument(part.text).catch(() => [] as number[])
+      : [];
+    chunks.push({ ...part, embedding });
+  }
+  await upsertChunks(chunks);
+}
+
 export async function retrieveContext(
   sources: SourceDocument[],
   extraLessons: Lesson[] = [],
-  limit = 6,
+  extraKnowledge: KnowledgeDoc[] = [],
+  limit = 8,
 ): Promise<RetrievedChunk[]> {
   if (extraLessons.length) {
     await indexLessons(extraLessons);
+  }
+  if (extraKnowledge.length) {
+    await indexKnowledge(extraKnowledge);
   }
 
   const chunks = await ensureSeeded();

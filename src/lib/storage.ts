@@ -3,11 +3,13 @@ import { makeVersion } from "./workflow";
 import type {
   BidComparable,
   CompanyProfile,
+  KnowledgeDoc,
   Lesson,
   Proposal,
   ProposalVersion,
 } from "./types";
 import { DEFAULT_COMPANY, SAMPLE_PAST_BIDS, STORAGE_KEYS } from "./defaults";
+import { SAMPLE_KNOWLEDGE } from "./sample-knowledge";
 import { SAMPLE_LESSONS } from "./sample-lessons";
 
 function readJson<T>(key: string): T | null {
@@ -21,7 +23,13 @@ function readJson<T>(key: string): T | null {
 }
 
 export function loadCompany(): CompanyProfile {
-  return readJson<CompanyProfile>(STORAGE_KEYS.company) ?? DEFAULT_COMPANY;
+  const stored = readJson<Partial<CompanyProfile>>(STORAGE_KEYS.company);
+  if (!stored) return DEFAULT_COMPANY;
+  return {
+    ...DEFAULT_COMPANY,
+    ...stored,
+    rates: stored.rates?.length ? stored.rates : DEFAULT_COMPANY.rates,
+  };
 }
 
 export function saveCompany(company: CompanyProfile) {
@@ -82,6 +90,40 @@ export function addLesson(lesson: Lesson) {
 export function removeLesson(id: string) {
   const next = loadLessons().filter((item) => item.id !== id);
   saveLessons(next);
+  return next;
+}
+
+export function loadKnowledge(): KnowledgeDoc[] {
+  return readJson<KnowledgeDoc[]>(STORAGE_KEYS.knowledge) ?? SAMPLE_KNOWLEDGE;
+}
+
+export function saveKnowledge(docs: KnowledgeDoc[]) {
+  window.localStorage.setItem(STORAGE_KEYS.knowledge, JSON.stringify(docs));
+}
+
+export async function addKnowledge(doc: KnowledgeDoc) {
+  const next = [doc, ...loadKnowledge().filter((item) => item.id !== doc.id)];
+  saveKnowledge(next);
+  const response = await fetch("/api/rag/index", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ knowledge: doc }),
+  });
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => ({}))) as { error?: string };
+    throw new Error(payload.error || "Could not index knowledge.");
+  }
+  return next;
+}
+
+export async function removeKnowledge(id: string) {
+  const next = loadKnowledge().filter((item) => item.id !== id);
+  saveKnowledge(next);
+  await fetch("/api/rag/index", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ removeSourceId: id }),
+  }).catch(() => undefined);
   return next;
 }
 

@@ -52,4 +52,103 @@ body {
     padding: 0 !important;
     max-width: none !important;
   }
+
+  .print-only {
+    display: block !important;
+  }
+
+  body:not([data-print]) .print-only {
+    display: none !important;
+  }
+
+  .print-cover {
+    break-after: page;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .print-break {
+    break-before: page;
+  }
+
+  .print-board {
+    break-inside: avoid;
+    page: board;
+  }
+
+  @page {
+    size: A4;
+    margin: 14mm 14mm 16mm;
+  }
+
+  @page board {
+    size: A4 landscape;
+    margin: 10mm;
+  }
+
+  body[data-print="full"] .print-pack-sow-cover,
+  body[data-print="full"] .print-pack-board,
+  body[data-print="full"] .print-inline-commercial {
+    display: none !important;
+  }
+
+  body[data-print="sow"] .print-pack-cover,
+  body[data-print="sow"] .print-pack-commercial,
+  body[data-print="sow"] .print-pack-msa,
+  body[data-print="sow"] .print-pack-board,
+  body[data-print="sow"] .print-inline-commercial {
+    display: none !important;
+  }
+
+  body[data-print="commercial"] .print-pack-cover,
+  body[data-print="commercial"] .print-pack-sow-cover,
+  body[data-print="commercial"] .print-pack-proposal,
+  body[data-print="commercial"] .print-pack-msa,
+  body[data-print="commercial"] .print-pack-board {
+    display: none !important;
+  }
+
+  body[data-print="board"] .print-pack-cover,
+  body[data-print="board"] .print-pack-sow-cover,
+  body[data-print="board"] .print-pack-proposal,
+  body[data-print="board"] .print-pack-commercial,
+  body[data-print="board"] .print-pack-msa {
+    display: none !important;
+  }
+
+  body[data-print="msa"] .print-pack-cover,
+  body[data-print="msa"] .print-pack-sow-cover,
+  body[data-print="msa"] .print-pack-proposal,
+  body[data-print="msa"] .print-pack-commercial,
+  body[data-print="msa"] .print-pack-board {
+    display: none !important;
+  }
+
+  body[data-print="kickoff"] .print-pack-raid,
+  body[data-print="kickoff"] .print-pack-epics,
+  body[data-print="kickoff"] .print-pack-change {
+    display: none !important;
+  }
+
+  body[data-print="raid"] .print-pack-kickoff,
+  body[data-print="raid"] .print-pack-epics,
+  body[data-print="raid"] .print-pack-change {
+    display: none !important;
+  }
+
+  body[data-print="change"] .print-pack-kickoff,
+  body[data-print="change"] .print-pack-raid,
+  body[data-print="change"] .print-pack-epics {
+    display: none !important;
+  }
+
+  body[data-print="commercial"] .print-pack-commercial,
+  body[data-print="msa"] .print-pack-msa,
+  body[data-print="board"] .print-pack-board {
+    break-before: auto;
+  }
+}
+
+.print-only {
+  display: none;
 }

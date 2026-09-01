@@ -3,6 +3,7 @@ import { DEFAULT_COMPANY } from "@/lib/defaults";
 import type {
   BidComparable,
   CompanyProfile,
+  KnowledgeDoc,
   Lesson,
   ProjectType,
   SourceDocument,
@@ -21,6 +22,7 @@ export async function POST(request: Request) {
   let sources: SourceDocument[] = [];
   let company: CompanyProfile = DEFAULT_COMPANY;
   let lessons: Lesson[] = [];
+  let knowledge: KnowledgeDoc[] = [];
   let projectType: ProjectType = "web";
   let pastBids: BidComparable[] = [];
 
@@ -29,12 +31,14 @@ export async function POST(request: Request) {
       sources?: SourceDocument[];
       company?: CompanyProfile | null;
       lessons?: Lesson[];
+      knowledge?: KnowledgeDoc[];
       projectType?: ProjectType;
       pastBids?: BidComparable[];
     };
     sources = body.sources ?? [];
     company = { ...DEFAULT_COMPANY, ...(body.company ?? {}) };
     lessons = body.lessons ?? [];
+    knowledge = body.knowledge ?? [];
     projectType = body.projectType ?? "web";
     pastBids = body.pastBids ?? [];
   } catch {
@@ -52,6 +56,7 @@ export async function POST(request: Request) {
           sources,
           company,
           lessons,
+          knowledge,
           projectType,
           pastBids,
           onEvent: (event) => {

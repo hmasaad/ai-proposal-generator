@@ -2,7 +2,8 @@ import type { BidComparable, CompanyProfile, ProjectType, SourceKind } from "./t
 
 export const SOURCE_KINDS: { id: SourceKind; label: string }[] = [
   { id: "rfp", label: "RFP / RFQ" },
-  { id: "email", label: "Client email" },
+  { id: "email", label: "Email thread" },
+  { id: "transcript", label: "Zoom / Meet transcript" },
   { id: "notes", label: "Meeting notes" },
   { id: "requirements", label: "Requirements" },
   { id: "project", label: "Existing project" },
@@ -26,6 +27,8 @@ export const DEFAULT_COMPANY: CompanyProfile = {
     { role: "Engineer", hourlyRate: 110 },
     { role: "QA / automation", hourlyRate: 95 },
   ],
+  legalName: "Northline Studio LLC",
+  address: "US-based delivery · notices at hello@northline.example",
 };
 
 export const STORAGE_KEYS = {
@@ -35,6 +38,7 @@ export const STORAGE_KEYS = {
   history: "proposal-agent:history",
   versions: "proposal-agent:versions",
   author: "proposal-agent:author",
+  knowledge: "proposal-agent:knowledge",
 } as const;
 
 export const PROJECT_TYPES: {

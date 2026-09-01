@@ -65,7 +65,37 @@ export type SourceKind =
   | "notes"
   | "requirements"
   | "project"
-  | "past_proposal";
+  | "past_proposal"
+  | "transcript";
+
+export type KnowledgeKind = "sow" | "case_study" | "stack" | "playbook";
+
+export interface KnowledgeDoc {
+  id: string;
+  createdAt: string;
+  kind: KnowledgeKind;
+  title: string;
+  text: string;
+}
+
+export type FitLevel = "strong" | "adequate" | "weak" | "out";
+
+export interface RfpCriterion {
+  criterion: string;
+  importance: "must" | "should" | "nice";
+  ourPosition: FitLevel;
+  why: string;
+  bidMove: string;
+}
+
+export interface RfpScore {
+  competitorsNamed: string[];
+  criteria: RfpCriterion[];
+  strengths: string[];
+  weaknesses: string[];
+  winThemes: string[];
+  watchouts: string[];
+}
 
 export interface SourceDocument {
   id: string;
@@ -88,6 +118,90 @@ export interface CompanyProfile {
   currency: string;
   hoursPerDay: number;
   defaultContingencyPct: number;
+  legalName?: string;
+  address?: string;
+  logoDataUrl?: string;
+  paymentTerms?: string;
+  msaTemplate?: string;
+}
+
+export type ClientPackKind = "full" | "sow" | "commercial" | "board" | "msa";
+
+export type RaidKind = "risk" | "assumption" | "issue" | "dependency";
+
+export type RaidStatus = "open" | "watch" | "closed";
+
+export interface RaidItem {
+  id: string;
+  kind: RaidKind;
+  title: string;
+  owner: string;
+  due: string;
+  status: RaidStatus;
+  notes: string;
+}
+
+export interface KickoffSession {
+  title: string;
+  day: string;
+  durationMins: number;
+  attendees: string[];
+  agenda: string[];
+  outputs: string[];
+}
+
+export interface KickoffPlan {
+  generatedAt: string;
+  goal: string;
+  sessions: KickoffSession[];
+  accessNeeded: string[];
+  decisionsNeeded: string[];
+  communications: string[];
+}
+
+export interface DeliveryStory {
+  key: string;
+  title: string;
+  description: string;
+  acceptance: string[];
+  estimatePoints: number;
+  labels: string[];
+}
+
+export interface DeliveryEpic {
+  key: string;
+  title: string;
+  phase: string;
+  summary: string;
+  stories: DeliveryStory[];
+}
+
+export type ChangeOrderStatus = "draft" | "sent" | "approved" | "rejected";
+
+export interface ChangeOrder {
+  id: string;
+  createdAt: string;
+  request: string;
+  title: string;
+  inBaseline: boolean;
+  rationale: string;
+  addedScope: ScopeItem[];
+  estimates: EstimateLine[];
+  totalHours: number;
+  totalCost: number;
+  extraWeeks: number;
+  assumptions: string[];
+  clientLetter: string;
+  status: ChangeOrderStatus;
+  appliedAt?: string;
+}
+
+export interface DeliveryPack {
+  generatedAt?: string;
+  kickoff?: KickoffPlan;
+  raid?: RaidItem[];
+  epics?: DeliveryEpic[];
+  changeOrders?: ChangeOrder[];
 }
 
 export interface RequirementBrief {
@@ -196,10 +310,12 @@ export interface Proposal {
   language?: OutputLanguage;
   comments?: SectionComment[];
   updatedAt?: string;
+  rfpScore?: RfpScore;
+  delivery?: DeliveryPack;
   retrievedMemory?: {
     id: string;
     title: string;
-    sourceType: "lesson" | "proposal";
+    sourceType: "lesson" | "proposal" | "knowledge";
     text: string;
     score: number;
   }[];
@@ -208,6 +324,7 @@ export interface Proposal {
 export type AgentStepId =
   | "ingest"
   | "extract"
+  | "score"
   | "learn"
   | "scope"
   | "estimate"

@@ -7,7 +7,7 @@ import { AgentProgress } from "@/components/AgentProgress";
 import { SourceIntake } from "@/components/SourceIntake";
 import { describeStep, readSse } from "@/lib/client";
 import { DEFAULT_COMPANY, PROJECT_TYPES } from "@/lib/defaults";
-import { loadCompany, loadHistory, loadLessons, saveProposal } from "@/lib/storage";
+import { loadCompany, loadHistory, loadKnowledge, loadLessons, saveProposal } from "@/lib/storage";
 import { SAMPLE_PROPOSAL } from "@/lib/sample-proposal";
 import { SAMPLE_SOURCES } from "@/lib/sample-rfp";
 import { money } from "@/lib/format";
@@ -48,6 +48,7 @@ export default function HomePage() {
           sources,
           company,
           lessons: loadLessons(),
+          knowledge: loadKnowledge(),
           projectType,
           pastBids: loadHistory(),
         }),
@@ -92,9 +93,9 @@ export default function HomePage() {
             Stop assembling proposals by hand.
           </h1>
           <p className="mt-4 max-w-xl text-[15px] leading-7 text-ink-soft">
-            Drop in client emails, RFPs, meeting notes, and past work. The agent extracts
-            requirements, then uses RAG over previous proposals and logged mistakes before it
-            writes scope, timeline, and estimates.
+            Drop in RFPs, Gmail/Outlook threads, Zoom or Meet transcripts, and past work. The
+            agent extracts requirements, scores where you are strong or weak, then uses RAG over
+            previous proposals, SOWs, and logged mistakes before it writes scope and estimates.
           </p>
 
           <div className="mt-8 flex flex-wrap gap-2">
@@ -208,7 +209,7 @@ export default function HomePage() {
             <p className="mt-3 text-xs leading-5 text-ink-soft">
               Needs <code className="rounded bg-paper-2 px-1">GEMINI_API_KEY</code> in{" "}
               <code className="rounded bg-paper-2 px-1">.env.local</code>. Gemini embeds studio
-              memory, retrieves the closest chunks, then drafts and reviews.
+              memory, retrieves the closest chunks, scores the RFP, then drafts and reviews.
             </p>
           </div>
 

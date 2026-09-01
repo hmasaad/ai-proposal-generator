@@ -1,5 +1,5 @@
 import { proposalToMarkdown } from "@/lib/proposal-markdown";
-import type { Lesson, Proposal } from "@/lib/types";
+import type { KnowledgeDoc, Lesson, Proposal } from "@/lib/types";
 import { chunkText, type RagChunk } from "./types";
 
 export function lessonToChunks(lesson: Lesson): Omit<RagChunk, "embedding">[] {
@@ -33,6 +33,17 @@ export function proposalToChunks(proposal: Proposal): Omit<RagChunk, "embedding"
     sourceId: proposal.id,
     sourceType: "proposal" as const,
     title: proposal.projectTitle,
+    text: part,
+  }));
+}
+
+export function knowledgeToChunks(doc: KnowledgeDoc): Omit<RagChunk, "embedding">[] {
+  const text = `Company knowledge [${doc.kind}] ${doc.title}\n${doc.text}`;
+  return chunkText(text, 1200).map((part, index) => ({
+    id: `${doc.id}:${index}`,
+    sourceId: doc.id,
+    sourceType: "knowledge" as const,
+    title: doc.title,
     text: part,
   }));
 }

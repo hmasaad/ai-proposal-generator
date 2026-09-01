@@ -1,6 +1,6 @@
-import { indexLessons, indexProposal, ensureIndex } from "@/lib/rag/retrieve";
-import { loadChunks } from "@/lib/rag/store";
-import type { Lesson, Proposal } from "@/lib/types";
+import { indexKnowledge, indexLessons, indexProposal, ensureIndex } from "@/lib/rag/retrieve";
+import { loadChunks, removeSource } from "@/lib/rag/store";
+import type { KnowledgeDoc, Lesson, Proposal } from "@/lib/types";
 
 export const runtime = "nodejs";
 
@@ -13,6 +13,9 @@ export async function GET() {
     proposals: new Set(
       chunks.filter((chunk) => chunk.sourceType === "proposal").map((chunk) => chunk.sourceId),
     ).size,
+    knowledge: new Set(
+      chunks.filter((chunk) => chunk.sourceType === "knowledge").map((chunk) => chunk.sourceId),
+    ).size,
   });
 }
 
@@ -21,6 +24,8 @@ export async function POST(request: Request) {
     const body = (await request.json()) as {
       lesson?: Lesson;
       proposal?: Proposal;
+      knowledge?: KnowledgeDoc;
+      removeSourceId?: string;
     };
 
     if (body.lesson) {
@@ -28,6 +33,12 @@ export async function POST(request: Request) {
     }
     if (body.proposal) {
       await indexProposal(body.proposal);
+    }
+    if (body.knowledge) {
+      await indexKnowledge([body.knowledge]);
+    }
+    if (body.removeSourceId) {
+      await removeSource(body.removeSourceId);
     }
 
     const chunks = await loadChunks();

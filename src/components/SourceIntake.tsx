@@ -1,14 +1,23 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { FileUp, Plus, Trash2 } from "lucide-react";
+import { Captions, FileUp, Mail, Plus, Trash2 } from "lucide-react";
 import { SOURCE_KINDS } from "@/lib/defaults";
-import { guessKind, newId } from "@/lib/format";
+import { ingestFileError, ingestSourceText } from "@/lib/ingest";
+import { parseEmailThread } from "@/lib/import-mail";
+import { parseTranscript } from "@/lib/import-transcript";
+import { newId } from "@/lib/format";
 import type { SourceDocument, SourceKind } from "@/lib/types";
+
+type Panel = "paste" | "email" | "transcript" | null;
 
 async function parseUploadedFile(file: File): Promise<string> {
   const extension = file.name.split(".").pop()?.toLowerCase() ?? "";
-  if (["txt", "md", "csv", "json", "html"].includes(extension) || file.type.startsWith("text/")) {
+  if (
+    ["txt", "md", "csv", "json", "html", "eml", "vtt", "srt"].includes(extension) ||
+    file.type.startsWith("text/") ||
+    file.type === "message/rfc822"
+  ) {
     return file.text();
   }
 
@@ -32,12 +41,21 @@ export function SourceIntake({
   disabled?: boolean;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
-  const [pasteOpen, setPasteOpen] = useState(false);
+  const [panel, setPanel] = useState<Panel>(null);
   const [pasteName, setPasteName] = useState("Pasted notes");
   const [pasteKind, setPasteKind] = useState<SourceKind>("notes");
   const [pasteText, setPasteText] = useState("");
+  const [specialName, setSpecialName] = useState("");
+  const [specialText, setSpecialText] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  function togglePanel(next: Panel) {
+    setPanel((open) => (open === next ? null : next));
+    setError(null);
+    if (next === "email") setSpecialName("Email thread");
+    if (next === "transcript") setSpecialName("Meeting transcript");
+  }
 
   async function addFiles(fileList: FileList | File[]) {
     setError(null);
@@ -45,12 +63,15 @@ export function SourceIntake({
     try {
       const next = [...sources];
       for (const file of Array.from(fileList)) {
-        const text = await parseUploadedFile(file);
+        const blocked = ingestFileError(file.name);
+        if (blocked) throw new Error(blocked);
+        const raw = await parseUploadedFile(file);
+        const ingested = ingestSourceText(file.name, raw);
         next.push({
           id: newId(),
           name: file.name,
-          kind: guessKind(file.name),
-          text,
+          kind: ingested.kind,
+          text: ingested.text,
         });
       }
       onChange(next);
@@ -63,17 +84,49 @@ export function SourceIntake({
 
   function addPaste() {
     if (!pasteText.trim()) return;
+    const ingested = ingestSourceText(pasteName, pasteText);
+    const autoKind = ingested.kind === "email" || ingested.kind === "transcript";
     onChange([
       ...sources,
       {
         id: newId(),
         name: pasteName.trim() || "Pasted notes",
-        kind: pasteKind,
-        text: pasteText,
+        kind: autoKind ? ingested.kind : pasteKind,
+        text: autoKind ? ingested.text : pasteText,
       },
     ]);
     setPasteText("");
-    setPasteOpen(false);
+    setPanel(null);
+  }
+
+  function addEmail() {
+    if (!specialText.trim()) return;
+    onChange([
+      ...sources,
+      {
+        id: newId(),
+        name: specialName.trim() || "Email thread",
+        kind: "email",
+        text: parseEmailThread(specialText),
+      },
+    ]);
+    setSpecialText("");
+    setPanel(null);
+  }
+
+  function addTranscript() {
+    if (!specialText.trim()) return;
+    onChange([
+      ...sources,
+      {
+        id: newId(),
+        name: specialName.trim() || "Meeting transcript",
+        kind: "transcript",
+        text: parseTranscript(specialText),
+      },
+    ]);
+    setSpecialText("");
+    setPanel(null);
   }
 
   function update(id: string, patch: Partial<SourceDocument>) {
@@ -93,7 +146,8 @@ export function SourceIntake({
         <FileUp className="mx-auto mb-3 h-5 w-5 text-moss" />
         <p className="font-serif text-lg">Drop client materials here</p>
         <p className="mt-1 text-sm text-ink-soft">
-          RFP, RFQ, emails, notes, requirements, or a previous proposal. PDF, Word, or text.
+          RFP, Gmail/Outlook thread, Zoom/Meet transcript, notes, or a previous proposal. PDF,
+          Word, .eml, .vtt, .srt, or text.
         </p>
         <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
           <button
@@ -107,7 +161,25 @@ export function SourceIntake({
           <button
             type="button"
             disabled={disabled}
-            onClick={() => setPasteOpen((open) => !open)}
+            onClick={() => togglePanel("email")}
+            className="inline-flex items-center gap-1 rounded-full border border-rule px-4 py-2 text-sm"
+          >
+            <Mail className="h-4 w-4" />
+            Email thread
+          </button>
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={() => togglePanel("transcript")}
+            className="inline-flex items-center gap-1 rounded-full border border-rule px-4 py-2 text-sm"
+          >
+            <Captions className="h-4 w-4" />
+            Transcript
+          </button>
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={() => togglePanel("paste")}
             className="inline-flex items-center gap-1 rounded-full border border-rule px-4 py-2 text-sm"
           >
             <Plus className="h-4 w-4" />
@@ -119,7 +191,7 @@ export function SourceIntake({
           type="file"
           multiple
           hidden
-          accept=".pdf,.doc,.docx,.txt,.md,.csv,.json,.html"
+          accept=".pdf,.doc,.docx,.txt,.md,.csv,.json,.html,.eml,.vtt,.srt"
           onChange={(event) => {
             if (event.target.files) void addFiles(event.target.files);
             event.target.value = "";
@@ -127,7 +199,7 @@ export function SourceIntake({
         />
       </div>
 
-      {pasteOpen && (
+      {panel === "paste" && (
         <div className="rounded-2xl border border-rule bg-white/50 p-4">
           <div className="mb-3 grid gap-3 sm:grid-cols-2">
             <input
@@ -162,6 +234,68 @@ export function SourceIntake({
               className="rounded-full bg-forest px-4 py-2 text-sm text-paper"
             >
               Add source
+            </button>
+          </div>
+        </div>
+      )}
+
+      {panel === "email" && (
+        <div className="rounded-2xl border border-rule bg-white/50 p-4">
+          <p className="text-sm text-ink-soft">
+            Paste a Gmail or Outlook thread, or upload an .eml. Quoted replies are split into
+            chronological messages. Outlook .msg is not supported — save as .eml instead.
+          </p>
+          <input
+            value={specialName}
+            onChange={(event) => setSpecialName(event.target.value)}
+            className="mt-3 w-full rounded-lg border border-rule bg-paper px-3 py-2 text-sm"
+            placeholder="Thread name"
+          />
+          <textarea
+            value={specialText}
+            onChange={(event) => setSpecialText(event.target.value)}
+            rows={10}
+            className="mt-3 w-full rounded-lg border border-rule bg-paper px-3 py-2 text-sm leading-relaxed"
+            placeholder={"From: Priya Shah\nSent: Thursday, August 21, 2026 9:14 AM\nSubject: Re: portal RFP\n\nThanks for jumping on the intro call…"}
+          />
+          <div className="mt-3 flex justify-end">
+            <button
+              type="button"
+              onClick={addEmail}
+              className="rounded-full bg-forest px-4 py-2 text-sm text-paper"
+            >
+              Clean and add
+            </button>
+          </div>
+        </div>
+      )}
+
+      {panel === "transcript" && (
+        <div className="rounded-2xl border border-rule bg-white/50 p-4">
+          <p className="text-sm text-ink-soft">
+            Paste a Zoom or Google Meet transcript, or upload .vtt / .srt. Consecutive lines from
+            the same speaker are collapsed into turns.
+          </p>
+          <input
+            value={specialName}
+            onChange={(event) => setSpecialName(event.target.value)}
+            className="mt-3 w-full rounded-lg border border-rule bg-paper px-3 py-2 text-sm"
+            placeholder="Call name"
+          />
+          <textarea
+            value={specialText}
+            onChange={(event) => setSpecialText(event.target.value)}
+            rows={10}
+            className="mt-3 w-full rounded-lg border border-rule bg-paper px-3 py-2 text-sm leading-relaxed"
+            placeholder={"WEBVTT\n\n00:00:04.000 --> 00:00:12.000\nPriya Shah: We looked at Phreesia…"}
+          />
+          <div className="mt-3 flex justify-end">
+            <button
+              type="button"
+              onClick={addTranscript}
+              className="rounded-full bg-forest px-4 py-2 text-sm text-paper"
+            >
+              Clean and add
             </button>
           </div>
         </div>

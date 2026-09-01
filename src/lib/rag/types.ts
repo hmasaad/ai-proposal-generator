@@ -1,4 +1,4 @@
-export type RagSourceType = "lesson" | "proposal";
+export type RagSourceType = "lesson" | "proposal" | "knowledge";
 
 export interface RagChunk {
   id: string;

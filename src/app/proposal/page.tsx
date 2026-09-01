@@ -5,6 +5,15 @@ import Link from "next/link";
 import { AppHeader } from "@/components/AppHeader";
 import { LessonForm } from "@/components/LessonForm";
 import { ProposalDocument } from "@/components/ProposalDocument";
+import { RfpScorecard } from "@/components/RfpScorecard";
+import { ExportActions } from "@/components/ExportActions";
+import {
+  BoardOnePager,
+  CommercialAppendix,
+  MsaAppendix,
+  ProposalCover,
+  SowCover,
+} from "@/components/ClientPack";
 import {
   addLesson,
   loadAuthor,
@@ -15,10 +24,10 @@ import {
   saveAuthor,
   saveProposal,
 } from "@/lib/storage";
-import { proposalToMarkdown } from "@/lib/proposal-markdown";
 import { formatDate, formatDateTime, money, newId } from "@/lib/format";
 import { outcomeLesson, projectTypeLabel } from "@/lib/accuracy";
 import { diffProposals } from "@/lib/proposal-diff";
+import { printClientPack } from "@/lib/export-pack";
 import {
   OUTPUT_LANGUAGES,
   PROPOSAL_SECTIONS,
@@ -41,7 +50,6 @@ import type {
 export default function ProposalPage() {
   const [proposal, setProposal] = useState<Proposal | null>(null);
   const [company, setCompany] = useState<CompanyProfile | null>(null);
-  const [copied, setCopied] = useState(false);
   const [ready, setReady] = useState(false);
   const [editing, setEditing] = useState(true);
   const [marked, setMarked] = useState<ProposalSectionId[]>([]);
@@ -79,26 +87,6 @@ export default function ProposalPage() {
     }
     setProposal(rolled);
     saveProposal(rolled, { index: Boolean(checkpoint) });
-  }
-
-  function downloadMarkdown() {
-    if (!proposal || !company) return;
-    const blob = new Blob([proposalToMarkdown(proposal, company.currency)], {
-      type: "text/markdown",
-    });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `${proposal.projectTitle.replace(/\s+/g, "-").toLowerCase()}-proposal.md`;
-    link.click();
-    URL.revokeObjectURL(url);
-  }
-
-  async function copyMarkdown() {
-    if (!proposal || !company) return;
-    await navigator.clipboard.writeText(proposalToMarkdown(proposal, company.currency));
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1600);
   }
 
   async function revise(mode: "revise" | "translate") {
@@ -154,6 +142,7 @@ export default function ProposalPage() {
         outcomeNote: proposal.outcomeNote,
         actualHours: proposal.actualHours,
         actualCost: proposal.actualCost,
+        delivery: proposal.delivery,
         reviewStatus: "draft",
       },
       `Before restore: ${version.label}`,
@@ -269,6 +258,18 @@ export default function ProposalPage() {
               </button>
             </div>
 
+            <div className="mt-6">
+              <ExportActions proposal={proposal} company={company} />
+            </div>
+            <div className="mt-6">
+              <Link
+                href="/delivery"
+                className="block rounded-2xl border border-rule px-3 py-2 text-sm"
+              >
+                <span className="block font-medium">Delivery workspace</span>
+                <span className="text-ink-soft">Kickoff, RAID, epics, change orders</span>
+              </Link>
+            </div>
             <div className="mt-6 flex flex-col gap-2">
               <button
                 type="button"
@@ -276,27 +277,6 @@ export default function ProposalPage() {
                 className="rounded-full border border-rule px-3 py-2 text-sm"
               >
                 {editing ? "Preview" : "Edit draft"}
-              </button>
-              <button
-                type="button"
-                onClick={() => window.print()}
-                className="rounded-full bg-forest px-3 py-2 text-sm text-paper"
-              >
-                Print / PDF
-              </button>
-              <button
-                type="button"
-                onClick={downloadMarkdown}
-                className="rounded-full border border-rule px-3 py-2 text-sm"
-              >
-                Download Markdown
-              </button>
-              <button
-                type="button"
-                onClick={() => void copyMarkdown()}
-                className="rounded-full border border-rule px-3 py-2 text-sm"
-              >
-                {copied ? "Copied" : "Copy Markdown"}
               </button>
               <button
                 type="button"
@@ -374,10 +354,10 @@ export default function ProposalPage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => window.print()}
+                  onClick={() => printClientPack("full")}
                   className="rounded-full bg-forest px-3 py-2 text-sm text-paper"
                 >
-                  Print / PDF
+                  Branded PDF
                 </button>
               </div>
             </div>
@@ -458,6 +438,8 @@ export default function ProposalPage() {
             </section>
           )}
 
+          <ProposalCover proposal={proposal} company={company} />
+          <SowCover proposal={proposal} company={company} />
           <ProposalDocument
             proposal={proposal}
             currency={company.currency}
@@ -497,6 +479,9 @@ export default function ProposalPage() {
                 }),
             }}
           />
+          <CommercialAppendix proposal={proposal} company={company} />
+          <MsaAppendix proposal={proposal} company={company} />
+          <BoardOnePager proposal={proposal} company={company} />
           <OutcomePanel
             proposal={proposal}
             currency={company.currency}
@@ -507,6 +492,7 @@ export default function ProposalPage() {
               if (lesson) addLesson(lesson);
             }}
           />
+          {proposal.rfpScore && <RfpScorecard score={proposal.rfpScore} />}
           {proposal.comparables && proposal.comparables.length > 0 && (
             <section className="no-print mt-8 rounded-3xl border border-rule bg-white/50 p-5">
               <h2 className="font-serif text-xl">Similar past bids</h2>
@@ -666,6 +652,15 @@ function OutcomePanel({
         >
           Update studio memory
         </button>
+      )}
+      {outcome === "won" && (
+        <p className="mt-4 text-sm leading-6">
+          They said yes.{" "}
+          <Link href="/delivery" className="text-forest underline">
+            Open delivery
+          </Link>{" "}
+          for kickoff, RAID, Jira/Linear epics, and change orders from this brief.
+        </p>
       )}
     </section>
   );

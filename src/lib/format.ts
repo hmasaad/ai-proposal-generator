@@ -31,6 +31,15 @@ export function guessKind(name: string) {
   const lower = name.toLowerCase();
   if (lower.includes("rfp") || lower.includes("rfq")) return "rfp" as const;
   if (lower.includes("email") || lower.endsWith(".eml")) return "email" as const;
+  if (
+    lower.endsWith(".vtt") ||
+    lower.endsWith(".srt") ||
+    lower.includes("transcript") ||
+    lower.includes("zoom") ||
+    lower.includes("meet")
+  ) {
+    return "transcript" as const;
+  }
   if (lower.includes("note") || lower.includes("meeting")) return "notes" as const;
   if (lower.includes("requirement")) return "requirements" as const;
   if (lower.includes("proposal")) return "past_proposal" as const;

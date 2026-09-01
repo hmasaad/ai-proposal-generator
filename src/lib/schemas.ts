@@ -176,3 +176,270 @@ export const proposalDraftJsonSchema: Record<string, unknown> = {
     "nextSteps",
   ],
 };
+
+export const rfpScoreSchema = z.object({
+  competitorsNamed: z.array(z.string()),
+  criteria: z.array(
+    z.object({
+      criterion: z.string(),
+      importance: z.enum(["must", "should", "nice"]),
+      ourPosition: z.enum(["strong", "adequate", "weak", "out"]),
+      why: z.string(),
+      bidMove: z.string(),
+    }),
+  ),
+  strengths: z.array(z.string()),
+  weaknesses: z.array(z.string()),
+  winThemes: z.array(z.string()),
+  watchouts: z.array(z.string()),
+});
+
+export const rfpScoreJsonSchema: Record<string, unknown> = {
+  type: "object",
+  properties: {
+    competitorsNamed: { type: "array", items: { type: "string" } },
+    criteria: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          criterion: { type: "string" },
+          importance: { type: "string", enum: ["must", "should", "nice"] },
+          ourPosition: { type: "string", enum: ["strong", "adequate", "weak", "out"] },
+          why: { type: "string" },
+          bidMove: { type: "string" },
+        },
+        required: ["criterion", "importance", "ourPosition", "why", "bidMove"],
+      },
+    },
+    strengths: { type: "array", items: { type: "string" } },
+    weaknesses: { type: "array", items: { type: "string" } },
+    winThemes: { type: "array", items: { type: "string" } },
+    watchouts: { type: "array", items: { type: "string" } },
+  },
+  required: [
+    "competitorsNamed",
+    "criteria",
+    "strengths",
+    "weaknesses",
+    "winThemes",
+    "watchouts",
+  ],
+};
+
+export const kickoffAndRaidSchema = z.object({
+  kickoff: z.object({
+    goal: z.string(),
+    sessions: z.array(
+      z.object({
+        title: z.string(),
+        day: z.string(),
+        durationMins: z.number(),
+        attendees: z.array(z.string()),
+        agenda: z.array(z.string()),
+        outputs: z.array(z.string()),
+      }),
+    ),
+    accessNeeded: z.array(z.string()),
+    decisionsNeeded: z.array(z.string()),
+    communications: z.array(z.string()),
+  }),
+  raid: z.array(
+    z.object({
+      kind: z.enum(["risk", "assumption", "issue", "dependency"]),
+      title: z.string(),
+      owner: z.string(),
+      due: z.string(),
+      status: z.enum(["open", "watch", "closed"]),
+      notes: z.string(),
+    }),
+  ),
+});
+
+export const deliveryEpicsSchema = z.object({
+  epics: z.array(
+    z.object({
+      title: z.string(),
+      phase: z.string(),
+      summary: z.string(),
+      stories: z.array(
+        z.object({
+          title: z.string(),
+          description: z.string(),
+          acceptance: z.array(z.string()),
+          estimatePoints: z.number(),
+          labels: z.array(z.string()),
+        }),
+      ),
+    }),
+  ),
+});
+
+export const changeOrderDraftSchema = z.object({
+  title: z.string(),
+  inBaseline: z.boolean(),
+  rationale: z.string(),
+  addedScope: z.array(
+    z.object({
+      title: z.string(),
+      description: z.string(),
+      included: z.boolean(),
+    }),
+  ),
+  estimates: z.array(
+    z.object({
+      role: z.string(),
+      hours: z.number(),
+    }),
+  ),
+  extraWeeks: z.number(),
+  assumptions: z.array(z.string()),
+  clientLetter: z.string(),
+});
+
+export const kickoffAndRaidJsonSchema: Record<string, unknown> = {
+  type: "object",
+  properties: {
+    kickoff: {
+      type: "object",
+      properties: {
+        goal: { type: "string" },
+        sessions: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              title: { type: "string" },
+              day: { type: "string" },
+              durationMins: { type: "number" },
+              attendees: { type: "array", items: { type: "string" } },
+              agenda: { type: "array", items: { type: "string" } },
+              outputs: { type: "array", items: { type: "string" } },
+            },
+            required: [
+              "title",
+              "day",
+              "durationMins",
+              "attendees",
+              "agenda",
+              "outputs",
+            ],
+          },
+        },
+        accessNeeded: { type: "array", items: { type: "string" } },
+        decisionsNeeded: { type: "array", items: { type: "string" } },
+        communications: { type: "array", items: { type: "string" } },
+      },
+      required: [
+        "goal",
+        "sessions",
+        "accessNeeded",
+        "decisionsNeeded",
+        "communications",
+      ],
+    },
+    raid: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          kind: {
+            type: "string",
+            enum: ["risk", "assumption", "issue", "dependency"],
+          },
+          title: { type: "string" },
+          owner: { type: "string" },
+          due: { type: "string" },
+          status: { type: "string", enum: ["open", "watch", "closed"] },
+          notes: { type: "string" },
+        },
+        required: ["kind", "title", "owner", "due", "status", "notes"],
+      },
+    },
+  },
+  required: ["kickoff", "raid"],
+};
+
+export const deliveryEpicsJsonSchema: Record<string, unknown> = {
+  type: "object",
+  properties: {
+    epics: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          title: { type: "string" },
+          phase: { type: "string" },
+          summary: { type: "string" },
+          stories: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                title: { type: "string" },
+                description: { type: "string" },
+                acceptance: { type: "array", items: { type: "string" } },
+                estimatePoints: { type: "number" },
+                labels: { type: "array", items: { type: "string" } },
+              },
+              required: [
+                "title",
+                "description",
+                "acceptance",
+                "estimatePoints",
+                "labels",
+              ],
+            },
+          },
+        },
+        required: ["title", "phase", "summary", "stories"],
+      },
+    },
+  },
+  required: ["epics"],
+};
+
+export const changeOrderDraftJsonSchema: Record<string, unknown> = {
+  type: "object",
+  properties: {
+    title: { type: "string" },
+    inBaseline: { type: "boolean" },
+    rationale: { type: "string" },
+    addedScope: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          title: { type: "string" },
+          description: { type: "string" },
+          included: { type: "boolean" },
+        },
+        required: ["title", "description", "included"],
+      },
+    },
+    estimates: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          role: { type: "string" },
+          hours: { type: "number" },
+        },
+        required: ["role", "hours"],
+      },
+    },
+    extraWeeks: { type: "number" },
+    assumptions: { type: "array", items: { type: "string" } },
+    clientLetter: { type: "string" },
+  },
+  required: [
+    "title",
+    "inBaseline",
+    "rationale",
+    "addedScope",
+    "estimates",
+    "extraWeeks",
+    "assumptions",
+    "clientLetter",
+  ],
+};

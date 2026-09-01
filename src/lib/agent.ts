@@ -11,17 +11,21 @@ import {
   proposalDraftSchema,
   requirementBriefJsonSchema,
   requirementBriefSchema,
+  rfpScoreJsonSchema,
+  rfpScoreSchema,
 } from "./schemas";
 import {
   DRAFT_SYSTEM,
   EXTRACT_SYSTEM,
   REVIEW_SYSTEM,
   REVISE_SYSTEM,
+  SCORE_SYSTEM,
   TRANSLATE_SYSTEM,
   draftPrompt,
   extractPrompt,
   reviewPrompt,
   revisePrompt,
+  scorePrompt,
   translatePrompt,
 } from "./prompts";
 import { indexProposal, retrieveContext } from "./rag/retrieve";
@@ -29,6 +33,7 @@ import type {
   AgentStepEvent,
   BidComparable,
   CompanyProfile,
+  KnowledgeDoc,
   Lesson,
   OutputLanguage,
   ProjectType,
@@ -64,6 +69,7 @@ export async function runProposalAgent(input: {
   sources: SourceDocument[];
   company: CompanyProfile;
   lessons?: Lesson[];
+  knowledge?: KnowledgeDoc[];
   projectType?: ProjectType;
   pastBids?: BidComparable[];
   onEvent: (event: AgentEvent) => void;
@@ -71,6 +77,7 @@ export async function runProposalAgent(input: {
   const {
     sources,
     lessons = [],
+    knowledge = [],
     projectType = "web",
     pastBids = [],
     onEvent,
@@ -104,19 +111,43 @@ export async function runProposalAgent(input: {
 
   onEvent({
     type: "step",
-    step: {
-      id: "learn",
-      label: "Retrieving past proposals and mistakes",
-    },
+    step: { id: "score", label: "Scoring fit, competitors, and bid posture" },
   });
 
-  const memory = await retrieveContext(sources, lessons);
+  const scored = await generateStructured({
+    schema: rfpScoreSchema,
+    jsonSchema: rfpScoreJsonSchema,
+    system: SCORE_SYSTEM,
+    prompt: scorePrompt(sources, company, JSON.stringify(extracted.object, null, 2)),
+  });
+
+  onEvent({
+    type: "step",
+    step: {
+      id: "score",
+      label: "Scoring fit, competitors, and bid posture",
+      detail:
+        scored.object.weaknesses[0]
+          ? `Weak on ${scored.object.weaknesses[0].slice(0, 72)}`
+          : `${scored.object.criteria.length} criteria`,
+    },
+  });
 
   onEvent({
     type: "step",
     step: {
       id: "learn",
-      label: "Retrieving past proposals and mistakes",
+      label: "Retrieving past proposals, knowledge, and mistakes",
+    },
+  });
+
+  const memory = await retrieveContext(sources, lessons, knowledge);
+
+  onEvent({
+    type: "step",
+    step: {
+      id: "learn",
+      label: "Retrieving past proposals, knowledge, and mistakes",
       detail:
         memory.length === 0
           ? "No studio memory yet"
@@ -158,6 +189,7 @@ export async function runProposalAgent(input: {
       memory,
       projectType,
       pastBids,
+      scored.object,
     ),
   });
 
@@ -178,6 +210,7 @@ export async function runProposalAgent(input: {
       JSON.stringify(drafted.object, null, 2),
       extracted.object.unknownOrMissing,
       memory,
+      scored.object,
     ),
   });
 
@@ -225,6 +258,7 @@ export async function runProposalAgent(input: {
     reviewStatus: "draft",
     language: "en",
     comments: [],
+    rfpScore: scored.object,
     appliedLessonIds: memory
       .filter((hit) => hit.sourceType === "lesson")
       .map((hit) => hit.sourceId),

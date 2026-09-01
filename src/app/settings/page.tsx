@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { AppHeader } from "@/components/AppHeader";
 import { DEFAULT_COMPANY, PROJECT_TYPES } from "@/lib/defaults";
+import { DEFAULT_MSA, DEFAULT_PAYMENT_TERMS } from "@/lib/legal";
 import { loadCompany, saveCompany } from "@/lib/storage";
 import type { CompanyProfile, RateCard } from "@/lib/types";
 
@@ -191,6 +192,99 @@ export default function SettingsPage() {
                 </li>
               ))}
             </ul>
+          </div>
+
+          <div>
+            <p className="text-sm text-ink-soft">Brand and legal</p>
+            <p className="mt-1 text-sm leading-6 text-ink-soft">
+              Logo, letterhead, payment terms, and the MSA template fill branded PDFs and Word
+              exports. Placeholders: {"{{clientName}}"}, {"{{projectTitle}}"}, {"{{vendorLegal}}"}, {"{{date}}"}, {"{{total}}"}, {"{{hours}}"}, {"{{address}}"}, {"{{paymentTerms}}"}.
+            </p>
+            <div className="mt-4 grid gap-4 sm:grid-cols-2">
+              <label className="block">
+                <span className="text-sm text-ink-soft">Legal name</span>
+                <input
+                  value={company.legalName ?? ""}
+                  onChange={(event) =>
+                    setCompany({ ...company, legalName: event.target.value })
+                  }
+                  className="mt-1 w-full rounded-xl border border-rule bg-white/60 px-3 py-2"
+                  placeholder={company.name}
+                />
+              </label>
+              <label className="block">
+                <span className="text-sm text-ink-soft">Address / notices</span>
+                <input
+                  value={company.address ?? ""}
+                  onChange={(event) => setCompany({ ...company, address: event.target.value })}
+                  className="mt-1 w-full rounded-xl border border-rule bg-white/60 px-3 py-2"
+                />
+              </label>
+            </div>
+            <label className="mt-4 block">
+              <span className="text-sm text-ink-soft">Logo</span>
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/webp,image/gif"
+                className="mt-1 block w-full text-sm"
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  event.target.value = "";
+                  if (!file) return;
+                  if (file.size > 700_000) {
+                    window.alert("Keep the logo under 700KB (PNG or JPEG).");
+                    return;
+                  }
+                  const reader = new FileReader();
+                  reader.onload = () => {
+                    const result = typeof reader.result === "string" ? reader.result : "";
+                    setCompany({ ...company, logoDataUrl: result });
+                  };
+                  reader.readAsDataURL(file);
+                }}
+              />
+              {company.logoDataUrl && (
+                <div className="mt-3 flex items-center gap-3">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={company.logoDataUrl}
+                    alt="Studio logo"
+                    className="h-10 max-w-[10rem] object-contain"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setCompany({ ...company, logoDataUrl: "" })}
+                    className="text-sm text-ink-soft hover:text-copper"
+                  >
+                    Remove
+                  </button>
+                </div>
+              )}
+            </label>
+            <label className="mt-4 block">
+              <span className="text-sm text-ink-soft">Payment terms</span>
+              <textarea
+                rows={3}
+                value={company.paymentTerms ?? DEFAULT_PAYMENT_TERMS}
+                onChange={(event) =>
+                  setCompany({ ...company, paymentTerms: event.target.value })
+                }
+                placeholder="40% kickoff, 40% UAT, 20% go-live. Net 15."
+                className="mt-1 w-full rounded-xl border border-rule bg-white/60 px-3 py-2 leading-relaxed"
+              />
+            </label>
+            <label className="mt-4 block">
+              <span className="text-sm text-ink-soft">MSA / legal terms template</span>
+              <textarea
+                rows={12}
+                value={company.msaTemplate ?? DEFAULT_MSA}
+                onChange={(event) =>
+                  setCompany({ ...company, msaTemplate: event.target.value })
+                }
+                placeholder="Leave blank to use the Northline template. Placeholders fill on export."
+                className="mt-1 w-full rounded-xl border border-rule bg-white/60 px-3 py-2 font-mono text-xs leading-5"
+              />
+            </label>
           </div>
 
           <div className="flex items-center gap-3">

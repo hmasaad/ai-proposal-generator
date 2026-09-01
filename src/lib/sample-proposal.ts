@@ -250,6 +250,82 @@ export const SAMPLE_PROPOSAL: Proposal = {
     "Entra ID tenant contact and access in the first ten days",
     "Kick off BAA with legal in week 1, not after UI polish",
   ],
+  rfpScore: {
+    competitorsNamed: ["Phreesia"],
+    criteria: [
+      {
+        criterion: "Online booking against live calendars",
+        importance: "must",
+        ourPosition: "strong",
+        why: "This is the core product we have delivered for clinics. RFP names CSV/iCal, not a mystery EHR.",
+        bidMove: "Lead with calendar as system of record and a two-week dual-run.",
+      },
+      {
+        criterion: "HIPAA-safe reminders (no PHI in SMS)",
+        importance: "must",
+        ourPosition: "strong",
+        why: "COO already constrained copy. We have a lost-bid lesson that forbids visit-reason SMS.",
+        bidMove: "Quote the allowed reminder cadence and keep Twilio copy in scope language.",
+      },
+      {
+        criterion: "US hosting + staff MFA / Entra ID",
+        importance: "must",
+        ourPosition: "strong",
+        why: "Matches studio stack standard for PHI-adjacent web.",
+        bidMove: "Name AWS US regions and Entra for staff in approach; do not invent FedRAMP.",
+      },
+      {
+        criterion: "Proxy / pediatric family access",
+        importance: "must",
+        ourPosition: "adequate",
+        why: "Required by email, not a commodity checkbox. We can build it; we should not treat it as a two-day add-on.",
+        bidMove: "Include as its own scope line; ask teen-confidentiality in week 1.",
+      },
+      {
+        criterion: "Calendar import from three Google Calendars",
+        importance: "must",
+        ourPosition: "weak",
+        why: "Westside overrun. Dual-run is the real work. Thread and transcript both flag it.",
+        bidMove: "Price migration as its own phase. Demand a sample iCal in week 1.",
+      },
+      {
+        criterion: "Epic / FHIR",
+        importance: "nice",
+        ourPosition: "out",
+        why: "RFP says not required for v1. We have no proof point.",
+        bidMove: "Exclude. Offer a discovery phase only if they insist.",
+      },
+      {
+        criterion: "Buy vs build vs Phreesia",
+        importance: "should",
+        ourPosition: "adequate",
+        why: "COO asked for an honest take. Suite is heavy; we win on a focused portal, not on matching every engagement module.",
+        bidMove: "Win theme: booking quality over suite breadth. Do not pretend we are a patient-engagement platform.",
+      },
+    ],
+    strengths: [
+      "HIPAA-adjacent web on the studio stack (Next.js, Postgres, US AWS)",
+      "PHI-safe reminder copy and a written SMS constraint",
+      "Focused custom portal vs a suite Meridian will half-use",
+      "Staff Entra ID + MFA as a standard, not a special",
+    ],
+    weaknesses: [
+      "Calendar dual-run across three Google Calendars — we have overrun this before",
+      "No Epic/FHIR proof; do not bid it as included",
+      "No native apps and no in-portal video — out, not a stretch",
+      "Payments are optional to the COO; easy to over-sell Stripe",
+    ],
+    winThemes: [
+      "One calendar of record, not four Google Calendars",
+      "Build a booking product, do not buy a suite you will not use",
+      "Compliance in week 1 (BAA, SMS copy, proxy policy), not after polish",
+    ],
+    watchouts: [
+      "Do not quote calendar import as a two-day job",
+      "Do not put visit reason in SMS",
+      "If the board needs a cheaper cut, drop payments — not booking or proxy",
+    ],
+  },
   comparables: [
     {
       id: "past-clinic-cal",

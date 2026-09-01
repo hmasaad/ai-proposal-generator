@@ -93,4 +93,44 @@ Can you include a recommendation on build vs buying a patient-engagement suite? 
 - Legal review of BAA + privacy policy will take ~3 weeks; start that in parallel with design.
 - Decision maker: Priya. Board wants a number they can approve in one meeting.`,
   },
+  {
+    id: "sample-outlook",
+    name: "Outlook thread — calendar dual-run",
+    kind: "email",
+    text: `From: James Chen <james.westside@meridian.example>
+Sent: Thursday, August 21, 2026 9:14 AM
+To: Priya Shah <priya@meridian.example>; vendors@northline.example
+Subject: RE: portal RFP — Google Calendar dual-run
+
+Priya — if they bid calendar import as a couple of days we will be in trouble. Westside has three Google Calendars and we still double-book. They need a dual-run with front desk, and a sample iCal in week 1.
+
+Also: visit-type labels have to be in plain language or we will keep calling patients who booked the wrong slot.
+
+-----Original Message-----
+From: Priya Shah <priya@meridian.example>
+Sent: Wednesday, August 20, 2026 4:02 PM
+To: James Chen <james.westside@meridian.example>
+Cc: vendors@northline.example
+Subject: portal RFP — Google Calendar dual-run
+
+James, can you tell vendors what the calendar situation actually is? I don't want another "we'll import iCal in two days" bid. Dana can export. Front desk has to trust the portal before we cut over.`,
+  },
+  {
+    id: "sample-transcript",
+    name: "Zoom — intro call transcript",
+    kind: "transcript",
+    text: `WEBVTT
+
+00:00:04.000 --> 00:00:14.120
+Priya Shah: We looked at Phreesia. It is a lot of product we will not use. I need you to say if we should still buy or build. Booking quality matters more than payments.
+
+00:00:15.000 --> 00:00:26.400
+Dana Ortiz: I can export Google Calendar as iCal this week. I cannot keep two systems in sync after go-live unless that is a paid phase.
+
+00:00:27.200 --> 00:00:39.800
+James Chen: Front desk will not trust the portal until they can override a booking for two weeks. Dual-run is not optional.
+
+00:00:40.500 --> 00:00:52.000
+Priya Shah: If we have to cut, drop Stripe for a quarter. Do not drop proxy access for the pediatric clinics.`,
+  },
 ];
