@@ -5,6 +5,7 @@ import {
   similarBids,
   weekOneNeeds,
 } from "./accuracy";
+import { addUsage, emptyUsage } from "./pricing";
 import { generateStructured } from "./model";
 import {
   proposalDraftJsonSchema,
@@ -35,6 +36,7 @@ import type {
   CompanyProfile,
   KnowledgeDoc,
   Lesson,
+  ModelUsage,
   OutputLanguage,
   ProjectType,
   Proposal,
@@ -51,6 +53,7 @@ import {
 export type AgentEvent =
   | { type: "step"; step: AgentStepEvent }
   | { type: "proposal"; proposal: Proposal }
+  | { type: "usage"; usage: ModelUsage }
   | { type: "error"; message: string };
 
 function totals(
@@ -83,6 +86,7 @@ export async function runProposalAgent(input: {
     onEvent,
   } = input;
   const company = ratesForType(input.company, projectType);
+  let usage = emptyUsage();
 
   if (!sources.length || sources.every((source) => !source.text.trim())) {
     throw new Error("Add at least one source with content before generating.");
@@ -108,6 +112,7 @@ export async function runProposalAgent(input: {
     system: EXTRACT_SYSTEM,
     prompt: extractPrompt(sources),
   });
+  usage = addUsage(usage, extracted.usage);
 
   onEvent({
     type: "step",
@@ -120,6 +125,7 @@ export async function runProposalAgent(input: {
     system: SCORE_SYSTEM,
     prompt: scorePrompt(sources, company, JSON.stringify(extracted.object, null, 2)),
   });
+  usage = addUsage(usage, scored.usage);
 
   onEvent({
     type: "step",
@@ -192,6 +198,7 @@ export async function runProposalAgent(input: {
       scored.object,
     ),
   });
+  usage = addUsage(usage, drafted.usage);
 
   onEvent({
     type: "step",
@@ -213,6 +220,7 @@ export async function runProposalAgent(input: {
       scored.object,
     ),
   });
+  usage = addUsage(usage, reviewed.usage);
 
   const draft = reviewed.object;
   const rolled = totals(draft.estimates, draft.contingencyPct);
@@ -273,6 +281,7 @@ export async function runProposalAgent(input: {
 
   void indexProposal(proposal).catch(() => undefined);
 
+  onEvent({ type: "usage", usage });
   onEvent({ type: "proposal", proposal });
   return proposal;
 }
@@ -335,7 +344,10 @@ export async function reviseProposalSections(input: {
   });
 
   const generated = generatedAsProposal(drafted.object as Proposal, input.proposal);
-  return mergeGeneratedSections(input.proposal, generated, input.sections);
+  return {
+    proposal: mergeGeneratedSections(input.proposal, generated, input.sections),
+    usage: drafted.usage,
+  };
 }
 
 export async function translateProposal(input: {
@@ -375,5 +387,5 @@ export async function translateProposal(input: {
   next.language = input.language;
   next.reviewStatus =
     next.reviewStatus === "client_ready" ? "internal_review" : next.reviewStatus;
-  return next;
+  return { proposal: next, usage: drafted.usage };
 }

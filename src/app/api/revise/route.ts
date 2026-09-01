@@ -1,21 +1,27 @@
 import { reviseProposalSections, translateProposal } from "@/lib/agent";
-import { DEFAULT_COMPANY } from "@/lib/defaults";
-import type {
-  CompanyProfile,
-  OutputLanguage,
-  Proposal,
-  ProposalSectionId,
-} from "@/lib/types";
+import { recordAudit } from "@/lib/audit";
+import { jsonError, requireSession } from "@/lib/auth";
+import { canDraft } from "@/lib/session";
+import { loadStudio } from "@/lib/studio-store";
+import { recordUsage } from "@/lib/usage";
+import type { OutputLanguage, Proposal, ProposalSectionId } from "@/lib/types";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
 
 export async function POST(request: Request) {
   try {
+    const user = await requireSession(request);
+    if (!canDraft(user.role)) {
+      return Response.json(
+        { error: "Sales drafts proposals. Finance locks the rate card." },
+        { status: 403 },
+      );
+    }
+
     const body = (await request.json()) as {
       mode?: "revise" | "translate";
       proposal?: Proposal;
-      company?: CompanyProfile | null;
       sections?: ProposalSectionId[];
       instruction?: string;
       language?: OutputLanguage;
@@ -25,30 +31,41 @@ export async function POST(request: Request) {
       return Response.json({ error: "Missing proposal" }, { status: 400 });
     }
 
-    const company = { ...DEFAULT_COMPANY, ...(body.company ?? {}) };
+    const studio = await loadStudio();
+    const extra = {
+      proposalId: body.proposal.id,
+      projectTitle: body.proposal.projectTitle,
+    };
 
     if (body.mode === "translate") {
       if (!body.language) {
         return Response.json({ error: "Pick a language." }, { status: 400 });
       }
-      const proposal = await translateProposal({
+      const result = await translateProposal({
         proposal: body.proposal,
         language: body.language,
       });
-      return Response.json({ proposal });
+      await recordAudit(user, "translate", `Translated to ${body.language}`, extra);
+      await recordUsage(user, "translate", result.usage, extra);
+      return Response.json({ proposal: result.proposal, usage: result.usage });
     }
 
-    const proposal = await reviseProposalSections({
+    const result = await reviseProposalSections({
       proposal: body.proposal,
-      company,
+      company: studio.company,
       sections: body.sections ?? [],
       instruction: body.instruction,
       language: body.language,
     });
-    return Response.json({ proposal });
+    await recordAudit(
+      user,
+      "revise",
+      body.instruction?.trim() || "Regenerated marked sections",
+      extra,
+    );
+    await recordUsage(user, "revise", result.usage, extra);
+    return Response.json({ proposal: result.proposal, usage: result.usage });
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Could not revise the draft.";
-    return Response.json({ error: message }, { status: 500 });
+    return jsonError(error);
   }
 }

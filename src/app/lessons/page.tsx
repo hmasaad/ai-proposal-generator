@@ -6,7 +6,7 @@ import { KnowledgeForm } from "@/components/KnowledgeForm";
 import { LessonForm } from "@/components/LessonForm";
 import { KNOWLEDGE_KINDS } from "@/lib/sample-knowledge";
 import { LESSON_CATEGORIES } from "@/lib/sample-lessons";
-import { loadKnowledge, loadLessons, removeKnowledge, removeLesson } from "@/lib/storage";
+import { loadKnowledge, loadLessons, removeKnowledge, removeLesson, hydrateStudio } from "@/lib/storage";
 import { formatDate } from "@/lib/format";
 import type { KnowledgeDoc, Lesson } from "@/lib/types";
 
@@ -15,7 +15,8 @@ export default function LessonsPage() {
   const [knowledge, setKnowledge] = useState<KnowledgeDoc[]>([]);
   const [chunkCount, setChunkCount] = useState<number | null>(null);
 
-  function refresh() {
+  async function refresh() {
+    await hydrateStudio();
     setLessons(loadLessons());
     setKnowledge(loadKnowledge());
     void fetch("/api/rag/index")
@@ -36,8 +37,8 @@ export default function LessonsPage() {
         <h1 className="mt-3 font-serif text-4xl tracking-tight">Studio memory</h1>
         <p className="mt-3 max-w-2xl text-[15px] leading-7 text-ink-soft">
           Logged mistakes, finished proposals, past SOWs, case studies, and stack standards are
-          chunked, embedded, and stored in a local vector index. The next generation retrieves
-          the closest chunks and the model has to apply them.
+          shared for the whole studio, then chunked into the vector index. The next generation
+          retrieves the closest chunks.
         </p>
         {chunkCount !== null && (
           <p className="mt-3 text-sm text-ink-soft">{chunkCount} chunks currently in the index.</p>
@@ -100,7 +101,7 @@ export default function LessonsPage() {
                 }}
                 className="mt-3 text-xs text-ink-soft hover:text-copper"
               >
-                Remove from browser list
+                Remove from studio memory
               </button>
             </li>
           ))}

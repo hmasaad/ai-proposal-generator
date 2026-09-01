@@ -1,8 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { canViewOps, roleLabel } from "@/lib/permissions";
+import { fetchMe } from "@/lib/storage";
+import type { SessionUser } from "@/lib/types";
 
 const links = [
   { href: "/", label: "New proposal" },
@@ -14,11 +17,25 @@ const links = [
 
 export function AppHeader() {
   const pathname = usePathname();
+  const router = useRouter();
   const [ready, setReady] = useState(false);
+  const [user, setUser] = useState<SessionUser | null>(null);
 
   useEffect(() => {
     setReady(true);
+    void fetchMe().then(setUser);
   }, []);
+
+  async function logout() {
+    await fetch("/api/auth/logout", { method: "POST" });
+    router.push("/login");
+    router.refresh();
+  }
+
+  const nav = [
+    ...links,
+    ...(user && canViewOps(user.role) ? [{ href: "/ops", label: "Ops" }] : []),
+  ];
 
   return (
     <header className="no-print border-b border-rule">
@@ -29,24 +46,36 @@ export function AppHeader() {
             Software house
           </span>
         </Link>
-        <nav className="flex items-center gap-1 text-sm">
-          {links.map((link) => {
-            const active = ready && pathname === link.href;
-            return (
-              <Link
-                key={link.href}
-                href={link.href}
-                className={`rounded-full px-3 py-1.5 transition ${
-                  active
-                    ? "bg-forest text-paper"
-                    : "text-ink-soft hover:bg-paper-2 hover:text-ink"
-                }`}
-              >
-                {link.label}
-              </Link>
-            );
-          })}
-        </nav>
+        <div className="flex items-center gap-3">
+          <nav className="flex items-center gap-1 text-sm">
+            {nav.map((link) => {
+              const active = ready && pathname === link.href;
+              return (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className={`rounded-full px-3 py-1.5 transition ${
+                    active
+                      ? "bg-forest text-paper"
+                      : "text-ink-soft hover:bg-paper-2 hover:text-ink"
+                  }`}
+                >
+                  {link.label}
+                </Link>
+              );
+            })}
+          </nav>
+          {user && (
+            <div className="hidden items-center gap-2 text-xs sm:flex">
+              <span className="text-ink-soft">
+                {user.name} · {roleLabel(user.role)}
+              </span>
+              <button type="button" onClick={() => void logout()} className="text-ink-soft hover:text-ink">
+                Sign out
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </header>
   );

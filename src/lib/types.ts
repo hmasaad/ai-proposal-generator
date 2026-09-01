@@ -123,6 +123,9 @@ export interface CompanyProfile {
   logoDataUrl?: string;
   paymentTerms?: string;
   msaTemplate?: string;
+  ratesLocked?: boolean;
+  ratesLockedAt?: string;
+  ratesLockedBy?: string;
 }
 
 export type ClientPackKind = "full" | "sow" | "commercial" | "board" | "msa";
@@ -335,4 +338,59 @@ export interface AgentStepEvent {
   id: AgentStepId;
   label: string;
   detail?: string;
+}
+
+export type StudioRole = "sales" | "finance" | "admin";
+
+export interface SessionUser {
+  id: string;
+  email: string;
+  name: string;
+  role: StudioRole;
+}
+
+export type AuditAction =
+  | "login"
+  | "generate"
+  | "revise"
+  | "translate"
+  | "send"
+  | "delivery"
+  | "index_knowledge"
+  | "index_lesson"
+  | "lock_rates"
+  | "unlock_rates"
+  | "save_profile"
+  | "invite_user";
+
+export interface AuditEvent {
+  id: string;
+  at: string;
+  userId: string;
+  userName: string;
+  email: string;
+  role: StudioRole;
+  action: AuditAction;
+  detail: string;
+  proposalId?: string;
+  projectTitle?: string;
+}
+
+export interface ModelUsage {
+  model: string;
+  inputTokens: number;
+  outputTokens: number;
+  thoughtTokens: number;
+  totalTokens: number;
+  costUsd: number;
+}
+
+export interface UsageEvent extends ModelUsage {
+  id: string;
+  at: string;
+  userId: string;
+  userName: string;
+  action: string;
+  proposalId?: string;
+  projectTitle?: string;
 }

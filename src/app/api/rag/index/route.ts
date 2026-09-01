@@ -1,11 +1,14 @@
+import { jsonError, requireSession } from "@/lib/auth";
 import { indexKnowledge, indexLessons, indexProposal, ensureIndex } from "@/lib/rag/retrieve";
 import { loadChunks, removeSource } from "@/lib/rag/store";
 import type { KnowledgeDoc, Lesson, Proposal } from "@/lib/types";
 
 export const runtime = "nodejs";
 
-export async function GET() {
-  const chunks = await ensureIndex();
+export async function GET(request: Request) {
+  try {
+    await requireSession(request);
+    const chunks = await ensureIndex();
   return Response.json({
     chunks: chunks.length,
     lessons: new Set(chunks.filter((chunk) => chunk.sourceType === "lesson").map((chunk) => chunk.sourceId))
@@ -17,10 +20,14 @@ export async function GET() {
       chunks.filter((chunk) => chunk.sourceType === "knowledge").map((chunk) => chunk.sourceId),
     ).size,
   });
+  } catch (error) {
+    return jsonError(error);
+  }
 }
 
 export async function POST(request: Request) {
   try {
+    await requireSession(request);
     const body = (await request.json()) as {
       lesson?: Lesson;
       proposal?: Proposal;
@@ -44,7 +51,6 @@ export async function POST(request: Request) {
     const chunks = await loadChunks();
     return Response.json({ ok: true, chunks: chunks.length });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Could not index memory.";
-    return Response.json({ error: message }, { status: 500 });
+    return jsonError(error);
   }
 }

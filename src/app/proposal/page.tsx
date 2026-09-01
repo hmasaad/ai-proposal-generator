@@ -23,6 +23,8 @@ import {
   pushVersion,
   saveAuthor,
   saveProposal,
+  fetchMe,
+  hydrateStudio,
 } from "@/lib/storage";
 import { formatDate, formatDateTime, money, newId } from "@/lib/format";
 import { outcomeLesson, projectTypeLabel } from "@/lib/accuracy";
@@ -62,19 +64,25 @@ export default function ProposalPage() {
   const [language, setLanguage] = useState<OutputLanguage>("en");
 
   useEffect(() => {
-    const loaded = loadProposal();
-    setProposal(loaded);
-    setCompany(loadCompany());
-    setAuthor(loadAuthor());
-    if (loaded) {
-      setLanguage(loaded.language ?? "en");
-      let existing = loadVersions(loaded.id);
-      if (existing.length === 0) {
-        existing = pushVersion(loaded, "Original");
+    void (async () => {
+      const user = await fetchMe();
+      await hydrateStudio();
+      const loaded = loadProposal();
+      setProposal(loaded);
+      setCompany(loadCompany());
+      const name = user?.name || loadAuthor();
+      setAuthor(name);
+      saveAuthor(name);
+      if (loaded) {
+        setLanguage(loaded.language ?? "en");
+        let existing = loadVersions(loaded.id);
+        if (existing.length === 0) {
+          existing = pushVersion(loaded, "Original");
+        }
+        setVersions(existing);
       }
-      setVersions(existing);
-    }
-    setReady(true);
+      setReady(true);
+    })();
   }, []);
 
   function persist(next: Proposal, checkpoint?: string) {
@@ -86,7 +94,11 @@ export default function ProposalPage() {
       setVersions(pushVersion(proposal, checkpoint));
     }
     setProposal(rolled);
-    saveProposal(rolled, { index: Boolean(checkpoint) });
+    saveProposal(rolled, {
+      index: Boolean(checkpoint),
+      share: Boolean(checkpoint) || rolled.outcome === "sent" || rolled.outcome === "won",
+      sent: rolled.outcome === "sent" && proposal?.outcome !== "sent",
+    });
   }
 
   async function revise(mode: "revise" | "translate") {

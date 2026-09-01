@@ -1,3 +1,4 @@
+import { jsonError, requireSession } from "@/lib/auth";
 import { proposalToDocx } from "@/lib/export-docx";
 import { fileSlug } from "@/lib/export-pack";
 import type { ClientPackKind, CompanyProfile, Proposal } from "@/lib/types";
@@ -6,6 +7,7 @@ export const runtime = "nodejs";
 
 export async function POST(request: Request) {
   try {
+    await requireSession(request);
     const body = (await request.json()) as {
       pack?: ClientPackKind;
       proposal?: Proposal;
@@ -27,7 +29,6 @@ export async function POST(request: Request) {
       },
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Could not build the Word file.";
-    return Response.json({ error: message }, { status: 500 });
+    return jsonError(error);
   }
 }

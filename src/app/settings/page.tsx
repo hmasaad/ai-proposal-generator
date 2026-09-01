@@ -4,15 +4,24 @@ import { useEffect, useState } from "react";
 import { AppHeader } from "@/components/AppHeader";
 import { DEFAULT_COMPANY, PROJECT_TYPES } from "@/lib/defaults";
 import { DEFAULT_MSA, DEFAULT_PAYMENT_TERMS } from "@/lib/legal";
-import { loadCompany, saveCompany } from "@/lib/storage";
-import type { CompanyProfile, RateCard } from "@/lib/types";
+import { canLockRates } from "@/lib/permissions";
+import { fetchMe, hydrateStudio, loadCompany, persistCompany, setRatesLocked } from "@/lib/storage";
+import { formatDateTime } from "@/lib/format";
+import type { CompanyProfile, RateCard, SessionUser } from "@/lib/types";
 
 export default function SettingsPage() {
   const [company, setCompany] = useState<CompanyProfile>(DEFAULT_COMPANY);
   const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [me, setMe] = useState<SessionUser | null>(null);
 
   useEffect(() => {
-    setCompany(loadCompany());
+    void (async () => {
+      const user = await fetchMe();
+      setMe(user);
+      await hydrateStudio();
+      setCompany(loadCompany());
+    })();
   }, []);
 
   function updateRate(index: number, patch: Partial<RateCard>) {
@@ -24,11 +33,19 @@ export default function SettingsPage() {
     });
   }
 
-  function persist() {
-    saveCompany(company);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 1600);
+  async function persist() {
+    setError(null);
+    try {
+      const savedCompany = await persistCompany(company);
+      setCompany(savedCompany);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 1600);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not save.");
+    }
   }
+
+  const ratesFrozen = Boolean(company.ratesLocked) && !(me && canLockRates(me.role));
 
   return (
     <div className="min-h-screen">
@@ -45,7 +62,7 @@ export default function SettingsPage() {
           className="mt-8 space-y-6"
           onSubmit={(event) => {
             event.preventDefault();
-            persist();
+            void persist();
           }}
         >
           <label className="block">
@@ -90,8 +107,9 @@ export default function SettingsPage() {
               <span className="text-sm text-ink-soft">Currency</span>
               <input
                 value={company.currency}
+                disabled={ratesFrozen}
                 onChange={(event) => setCompany({ ...company, currency: event.target.value })}
-                className="mt-1 w-full rounded-xl border border-rule bg-white/60 px-3 py-2"
+                className="mt-1 w-full rounded-xl border border-rule bg-white/60 px-3 py-2 disabled:opacity-60"
               />
             </label>
             <label className="block">
@@ -100,10 +118,11 @@ export default function SettingsPage() {
                 type="number"
                 min={1}
                 value={company.hoursPerDay}
+                disabled={ratesFrozen}
                 onChange={(event) =>
                   setCompany({ ...company, hoursPerDay: Number(event.target.value) })
                 }
-                className="mt-1 w-full rounded-xl border border-rule bg-white/60 px-3 py-2"
+                className="mt-1 w-full rounded-xl border border-rule bg-white/60 px-3 py-2 disabled:opacity-60"
               />
             </label>
             <label className="block">
@@ -112,13 +131,14 @@ export default function SettingsPage() {
                 type="number"
                 min={0}
                 value={company.defaultContingencyPct}
+                disabled={ratesFrozen}
                 onChange={(event) =>
                   setCompany({
                     ...company,
                     defaultContingencyPct: Number(event.target.value),
                   })
                 }
-                className="mt-1 w-full rounded-xl border border-rule bg-white/60 px-3 py-2"
+                className="mt-1 w-full rounded-xl border border-rule bg-white/60 px-3 py-2 disabled:opacity-60"
               />
             </label>
           </div>
@@ -126,45 +146,74 @@ export default function SettingsPage() {
           <div>
             <div className="mb-2 flex items-center justify-between">
               <span className="text-sm text-ink-soft">Rate card</span>
-              <button
-                type="button"
-                onClick={() =>
-                  setCompany({
-                    ...company,
-                    rates: [...company.rates, { role: "New role", hourlyRate: 100 }],
-                  })
-                }
-                className="text-sm text-forest"
-              >
-                Add role
-              </button>
+              <div className="flex items-center gap-3">
+                {me && canLockRates(me.role) && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      void setRatesLocked(!company.ratesLocked).then((next) => {
+                        if (next) setCompany(next);
+                      })
+                    }
+                    className="text-sm text-forest"
+                  >
+                    {company.ratesLocked ? "Unlock rates" : "Lock rates"}
+                  </button>
+                )}
+                {!company.ratesLocked && (
+                  <button
+                    type="button"
+                    disabled={ratesFrozen}
+                    onClick={() =>
+                      setCompany({
+                        ...company,
+                        rates: [...company.rates, { role: "New role", hourlyRate: 100 }],
+                      })
+                    }
+                    className="text-sm text-forest disabled:opacity-40"
+                  >
+                    Add role
+                  </button>
+                )}
+              </div>
             </div>
+            {company.ratesLocked && (
+              <p className="mb-3 text-sm text-ink-soft">
+                Finance locked the rate card
+                {company.ratesLockedBy ? ` (${company.ratesLockedBy})` : ""}
+                {company.ratesLockedAt ? ` ${formatDateTime(company.ratesLockedAt)}` : ""}.
+                Sales can still draft against these rates.
+              </p>
+            )}
             <ul className="space-y-2">
               {company.rates.map((row, index) => (
                 <li key={`${row.role}-${index}`} className="grid grid-cols-[1fr_8rem_auto] gap-2">
                   <input
                     value={row.role}
+                    disabled={ratesFrozen}
                     onChange={(event) => updateRate(index, { role: event.target.value })}
-                    className="rounded-xl border border-rule bg-white/60 px-3 py-2"
+                    className="rounded-xl border border-rule bg-white/60 px-3 py-2 disabled:opacity-60"
                   />
                   <input
                     type="number"
                     min={0}
+                    disabled={ratesFrozen}
                     value={row.hourlyRate}
                     onChange={(event) =>
                       updateRate(index, { hourlyRate: Number(event.target.value) })
                     }
-                    className="rounded-xl border border-rule bg-white/60 px-3 py-2"
+                    className="rounded-xl border border-rule bg-white/60 px-3 py-2 disabled:opacity-60"
                   />
                   <button
                     type="button"
+                    disabled={ratesFrozen}
                     onClick={() =>
                       setCompany({
                         ...company,
                         rates: company.rates.filter((_, rowIndex) => rowIndex !== index),
                       })
                     }
-                    className="rounded-xl px-3 text-sm text-ink-soft hover:text-copper"
+                    className="rounded-xl px-3 text-sm text-ink-soft hover:text-copper disabled:opacity-40"
                   >
                     Remove
                   </button>
@@ -294,7 +343,8 @@ export default function SettingsPage() {
             >
               Save profile
             </button>
-            {saved && <span className="text-sm text-moss">Saved in this browser.</span>}
+            {saved && <span className="text-sm text-moss">Saved to shared studio memory.</span>}
+            {error && <span className="text-sm text-copper">{error}</span>}
           </div>
         </form>
       </main>

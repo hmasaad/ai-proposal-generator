@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { AppHeader } from "@/components/AppHeader";
 import { DeliveryWorkspace } from "@/components/DeliveryWorkspace";
-import { loadCompany, loadProposal, saveProposal } from "@/lib/storage";
+import { loadCompany, loadProposal, saveProposal, hydrateStudio } from "@/lib/storage";
 import { applyInvestment } from "@/lib/workflow";
 import type { CompanyProfile, Proposal } from "@/lib/types";
 
@@ -14,9 +14,12 @@ export default function DeliveryPage() {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    setProposal(loadProposal());
-    setCompany(loadCompany());
-    setReady(true);
+    void (async () => {
+      await hydrateStudio();
+      setProposal(loadProposal());
+      setCompany(loadCompany());
+      setReady(true);
+    })();
   }, []);
 
   function persist(next: Proposal) {

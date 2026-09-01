@@ -23,6 +23,12 @@ export function formatDateTime(iso: string) {
   }).format(new Date(iso));
 }
 
+export function formatUsd(amount: number) {
+  if (amount <= 0) return "$0.00";
+  if (amount < 0.01) return `$${amount.toFixed(4)}`;
+  return `$${amount.toFixed(2)}`;
+}
+
 export function newId() {
   return crypto.randomUUID();
 }

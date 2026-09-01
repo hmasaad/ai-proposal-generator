@@ -7,6 +7,7 @@ import type {
   Lesson,
   Proposal,
   ProposalVersion,
+  SessionUser,
 } from "./types";
 import { DEFAULT_COMPANY, SAMPLE_PAST_BIDS, STORAGE_KEYS } from "./defaults";
 import { SAMPLE_KNOWLEDGE } from "./sample-knowledge";
@@ -40,9 +41,19 @@ export function loadProposal(): Proposal | null {
   return readJson<Proposal>(STORAGE_KEYS.proposal);
 }
 
-export function saveProposal(proposal: Proposal, options?: { index?: boolean }) {
+export function saveProposal(
+  proposal: Proposal,
+  options?: { index?: boolean; share?: boolean; sent?: boolean },
+) {
   window.localStorage.setItem(STORAGE_KEYS.proposal, JSON.stringify(proposal));
   upsertHistory(proposalToComparable(proposal));
+  if (options?.share || options?.sent) {
+    void fetch("/api/studio", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ proposal, sent: options.sent }),
+    }).catch(() => undefined);
+  }
   if (options?.index === false) return;
   void fetch("/api/rag/index", {
     method: "POST",
@@ -79,8 +90,8 @@ export function saveLessons(lessons: Lesson[]) {
 export function addLesson(lesson: Lesson) {
   const next = [lesson, ...loadLessons().filter((item) => item.id !== lesson.id)];
   saveLessons(next);
-  void fetch("/api/rag/index", {
-    method: "POST",
+  void fetch("/api/studio", {
+    method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ lesson }),
   }).catch(() => undefined);
@@ -90,6 +101,11 @@ export function addLesson(lesson: Lesson) {
 export function removeLesson(id: string) {
   const next = loadLessons().filter((item) => item.id !== id);
   saveLessons(next);
+  void fetch("/api/studio", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ removeLessonId: id }),
+  }).catch(() => undefined);
   return next;
 }
 
@@ -104,8 +120,8 @@ export function saveKnowledge(docs: KnowledgeDoc[]) {
 export async function addKnowledge(doc: KnowledgeDoc) {
   const next = [doc, ...loadKnowledge().filter((item) => item.id !== doc.id)];
   saveKnowledge(next);
-  const response = await fetch("/api/rag/index", {
-    method: "POST",
+  const response = await fetch("/api/studio", {
+    method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ knowledge: doc }),
   });
@@ -119,10 +135,10 @@ export async function addKnowledge(doc: KnowledgeDoc) {
 export async function removeKnowledge(id: string) {
   const next = loadKnowledge().filter((item) => item.id !== id);
   saveKnowledge(next);
-  await fetch("/api/rag/index", {
-    method: "POST",
+  await fetch("/api/studio", {
+    method: "PUT",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ removeSourceId: id }),
+    body: JSON.stringify({ removeKnowledgeId: id }),
   }).catch(() => undefined);
   return next;
 }
@@ -151,4 +167,70 @@ export function pushVersion(proposal: Proposal, label: string) {
   const next = [makeVersion(proposal, label), ...loadVersions(proposal.id)];
   saveVersions(proposal.id, next);
   return next;
+}
+
+export async function hydrateStudio() {
+  const response = await fetch("/api/studio");
+  if (!response.ok) return null;
+  const payload = (await response.json()) as {
+    company?: CompanyProfile;
+    lessons?: Lesson[];
+    knowledge?: KnowledgeDoc[];
+    history?: BidComparable[];
+    latestProposal?: Proposal | null;
+  };
+  if (payload.company) saveCompany(payload.company);
+  if (payload.lessons) saveLessons(payload.lessons);
+  if (payload.knowledge) saveKnowledge(payload.knowledge);
+  if (payload.history) saveHistory(payload.history);
+  if (payload.latestProposal) {
+    const local = loadProposal();
+    const serverTime = payload.latestProposal.updatedAt || payload.latestProposal.createdAt;
+    const localTime = local?.updatedAt || local?.createdAt || "";
+    if (!local || serverTime > localTime) {
+      window.localStorage.setItem(
+        STORAGE_KEYS.proposal,
+        JSON.stringify(payload.latestProposal),
+      );
+    }
+  }
+  return payload;
+}
+
+export async function persistCompany(company: CompanyProfile) {
+  saveCompany(company);
+  const response = await fetch("/api/studio", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ company }),
+  });
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => ({}))) as { error?: string };
+    throw new Error(payload.error || "Could not save the studio profile.");
+  }
+  const studio = (await response.json()) as { company?: CompanyProfile };
+  if (studio.company) saveCompany(studio.company);
+  return studio.company ?? company;
+}
+
+export async function setRatesLocked(locked: boolean) {
+  const response = await fetch("/api/studio", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ratesLocked: locked }),
+  });
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => ({}))) as { error?: string };
+    throw new Error(payload.error || "Could not update the rate lock.");
+  }
+  const studio = (await response.json()) as { company?: CompanyProfile };
+  if (studio.company) saveCompany(studio.company);
+  return studio.company;
+}
+
+export async function fetchMe(): Promise<SessionUser | null> {
+  const response = await fetch("/api/auth/me");
+  if (!response.ok) return null;
+  const payload = (await response.json()) as { user?: SessionUser };
+  return payload.user ?? null;
 }

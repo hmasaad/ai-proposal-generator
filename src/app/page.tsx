@@ -7,16 +7,19 @@ import { AgentProgress } from "@/components/AgentProgress";
 import { SourceIntake } from "@/components/SourceIntake";
 import { describeStep, readSse } from "@/lib/client";
 import { DEFAULT_COMPANY, PROJECT_TYPES } from "@/lib/defaults";
-import { loadCompany, loadHistory, loadKnowledge, loadLessons, saveProposal } from "@/lib/storage";
+import { canDraft } from "@/lib/permissions";
+import { formatUsd, money } from "@/lib/format";
 import { SAMPLE_PROPOSAL } from "@/lib/sample-proposal";
 import { SAMPLE_SOURCES } from "@/lib/sample-rfp";
-import { money } from "@/lib/format";
+import { fetchMe, hydrateStudio, loadCompany, saveProposal } from "@/lib/storage";
 import type {
   AgentStepEvent,
   AgentStepId,
   CompanyProfile,
+  ModelUsage,
   ProjectType,
   Proposal,
+  SessionUser,
   SourceDocument,
 } from "@/lib/types";
 
@@ -29,9 +32,15 @@ export default function HomePage() {
   const [error, setError] = useState<string | null>(null);
   const [company, setCompany] = useState<CompanyProfile>(DEFAULT_COMPANY);
   const [projectType, setProjectType] = useState<ProjectType>("web");
+  const [me, setMe] = useState<SessionUser | null>(null);
+  const [usage, setUsage] = useState<ModelUsage | null>(null);
 
   useEffect(() => {
-    setCompany(loadCompany());
+    void (async () => {
+      setMe(await fetchMe());
+      await hydrateStudio();
+      setCompany(loadCompany());
+    })();
   }, []);
 
   async function generate() {
@@ -46,11 +55,7 @@ export default function HomePage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           sources,
-          company,
-          lessons: loadLessons(),
-          knowledge: loadKnowledge(),
           projectType,
-          pastBids: loadHistory(),
         }),
       });
 
@@ -66,8 +71,11 @@ export default function HomePage() {
           setMessage(describeStep(step));
         }
         if (event === "proposal") {
-          saveProposal(data as Proposal);
+          saveProposal(data as Proposal, { share: true, index: true });
           router.push("/proposal");
+        }
+        if (event === "usage") {
+          setUsage(data as ModelUsage);
         }
         if (event === "error") {
           const payload = data as { message?: string };
@@ -114,7 +122,7 @@ export default function HomePage() {
               type="button"
               disabled={running}
               onClick={() => {
-                saveProposal(SAMPLE_PROPOSAL);
+                saveProposal(SAMPLE_PROPOSAL, { share: true, index: false });
                 router.push("/proposal");
               }}
               className="rounded-full border border-rule px-4 py-2 text-sm"
@@ -144,8 +152,16 @@ export default function HomePage() {
             <p className="mt-2 text-sm leading-6 text-ink-soft">
               Uses {company.name} rates and the{" "}
               {PROJECT_TYPES.find((item) => item.id === projectType)?.label} mix.
-              Edit the base card in Studio profile before you send a real bid.
+              Shared studio memory (lessons, SOWs, past bids) is loaded on the server.
             </p>
+            {me && !canDraft(me.role) && (
+              <p className="mt-3 text-sm text-ink-soft">
+                Finance locks rates on Studio profile. Sales drafts from this page.
+              </p>
+            )}
+            {company.ratesLocked && (
+              <p className="mt-2 text-xs text-moss">Rate card locked by finance.</p>
+            )}
             <fieldset className="mt-4">
               <legend className="text-sm text-ink-soft">Project type</legend>
               <div className="mt-2 grid gap-2">
@@ -200,12 +216,17 @@ export default function HomePage() {
 
             <button
               type="button"
-              disabled={running || sources.length === 0}
+              disabled={running || sources.length === 0 || Boolean(me && !canDraft(me.role))}
               onClick={() => void generate()}
               className="mt-5 w-full rounded-full bg-forest py-3 text-sm text-paper disabled:opacity-40"
             >
               {running ? "Agent working…" : "Generate proposal"}
             </button>
+            {usage && (
+              <p className="mt-3 text-xs leading-5 text-ink-soft">
+                Last run: {usage.totalTokens.toLocaleString()} tokens · {formatUsd(usage.costUsd)}
+              </p>
+            )}
             <p className="mt-3 text-xs leading-5 text-ink-soft">
               Needs <code className="rounded bg-paper-2 px-1">GEMINI_API_KEY</code> in{" "}
               <code className="rounded bg-paper-2 px-1">.env.local</code>. Gemini embeds studio

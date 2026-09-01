@@ -3,18 +3,29 @@ import {
   generateEpics,
   generateKickoffAndRaid,
 } from "@/lib/delivery-generate";
-import { DEFAULT_COMPANY } from "@/lib/defaults";
-import type { CompanyProfile, Proposal } from "@/lib/types";
+import { recordAudit } from "@/lib/audit";
+import { jsonError, requireSession } from "@/lib/auth";
+import { canDraft } from "@/lib/session";
+import { loadStudio } from "@/lib/studio-store";
+import { recordUsage } from "@/lib/usage";
+import type { Proposal } from "@/lib/types";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
 
 export async function POST(request: Request) {
   try {
+    const user = await requireSession(request);
+    if (!canDraft(user.role)) {
+      return Response.json(
+        { error: "Sales owns delivery artifacts after a win." },
+        { status: 403 },
+      );
+    }
+
     const body = (await request.json()) as {
       mode?: "kickoff" | "epics" | "changeOrder";
       proposal?: Proposal;
-      company?: CompanyProfile | null;
       request?: string;
     };
 
@@ -22,27 +33,35 @@ export async function POST(request: Request) {
       return Response.json({ error: "Missing proposal" }, { status: 400 });
     }
 
-    const company = { ...DEFAULT_COMPANY, ...(body.company ?? {}) };
+    const studio = await loadStudio();
+    const extra = {
+      proposalId: body.proposal.id,
+      projectTitle: body.proposal.projectTitle,
+    };
 
     if (body.mode === "epics") {
-      const epics = await generateEpics(body.proposal);
-      return Response.json({ epics });
+      const result = await generateEpics(body.proposal);
+      await recordAudit(user, "delivery", "Broke phases into Jira/Linear epics", extra);
+      await recordUsage(user, "delivery-epics", result.usage, extra);
+      return Response.json({ epics: result.epics, usage: result.usage });
     }
 
     if (body.mode === "changeOrder") {
-      const changeOrder = await generateChangeOrder({
+      const result = await generateChangeOrder({
         proposal: body.proposal,
-        company,
+        company: studio.company,
         request: body.request ?? "",
       });
-      return Response.json({ changeOrder });
+      await recordAudit(user, "delivery", `Change order: ${result.changeOrder.title}`, extra);
+      await recordUsage(user, "delivery-change-order", result.usage, extra);
+      return Response.json({ changeOrder: result.changeOrder, usage: result.usage });
     }
 
-    const pack = await generateKickoffAndRaid(body.proposal, company);
+    const pack = await generateKickoffAndRaid(body.proposal, studio.company);
+    await recordAudit(user, "delivery", "Built kickoff and RAID from the brief", extra);
+    await recordUsage(user, "delivery-kickoff", pack.usage, extra);
     return Response.json(pack);
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Could not build delivery artifacts.";
-    return Response.json({ error: message }, { status: 500 });
+    return jsonError(error);
   }
 }

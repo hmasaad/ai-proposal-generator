@@ -1,13 +1,11 @@
 import { runProposalAgent } from "@/lib/agent";
-import { DEFAULT_COMPANY } from "@/lib/defaults";
-import type {
-  BidComparable,
-  CompanyProfile,
-  KnowledgeDoc,
-  Lesson,
-  ProjectType,
-  SourceDocument,
-} from "@/lib/types";
+import { recordAudit } from "@/lib/audit";
+import { jsonError, requireSession } from "@/lib/auth";
+import { canDraft } from "@/lib/session";
+import { loadStudio, patchStudio } from "@/lib/studio-store";
+import { recordUsage } from "@/lib/usage";
+import { proposalToComparable } from "@/lib/accuracy";
+import type { ModelUsage, ProjectType, Proposal, SourceDocument } from "@/lib/types";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -19,31 +17,36 @@ function sse(event: string, data: unknown) {
 export async function POST(request: Request) {
   const encoder = new TextEncoder();
 
+  let user;
+  try {
+    user = await requireSession(request);
+  } catch (error) {
+    return jsonError(error);
+  }
+
+  if (!canDraft(user.role)) {
+    return Response.json(
+      { error: "Sales drafts proposals. Finance locks the rate card." },
+      { status: 403 },
+    );
+  }
+
   let sources: SourceDocument[] = [];
-  let company: CompanyProfile = DEFAULT_COMPANY;
-  let lessons: Lesson[] = [];
-  let knowledge: KnowledgeDoc[] = [];
   let projectType: ProjectType = "web";
-  let pastBids: BidComparable[] = [];
 
   try {
     const body = (await request.json()) as {
       sources?: SourceDocument[];
-      company?: CompanyProfile | null;
-      lessons?: Lesson[];
-      knowledge?: KnowledgeDoc[];
       projectType?: ProjectType;
-      pastBids?: BidComparable[];
     };
     sources = body.sources ?? [];
-    company = { ...DEFAULT_COMPANY, ...(body.company ?? {}) };
-    lessons = body.lessons ?? [];
-    knowledge = body.knowledge ?? [];
     projectType = body.projectType ?? "web";
-    pastBids = body.pastBids ?? [];
   } catch {
     return Response.json({ error: "Invalid JSON body" }, { status: 400 });
   }
+
+  const studio = await loadStudio();
+  const actor = user;
 
   const stream = new ReadableStream({
     async start(controller) {
@@ -52,20 +55,57 @@ export async function POST(request: Request) {
       };
 
       try {
+        let lastUsage: ModelUsage | null = null;
+        let lastProposal: Proposal | null = null;
         await runProposalAgent({
           sources,
-          company,
-          lessons,
-          knowledge,
+          company: studio.company,
+          lessons: studio.lessons,
+          knowledge: studio.knowledge,
           projectType,
-          pastBids,
+          pastBids: studio.history,
           onEvent: (event) => {
             if (event.type === "step") send("step", event.step);
-            if (event.type === "proposal") send("proposal", event.proposal);
+            if (event.type === "usage") {
+              lastUsage = event.usage;
+              send("usage", event.usage);
+            }
+            if (event.type === "proposal") {
+              lastProposal = event.proposal;
+              send("proposal", event.proposal);
+            }
             if (event.type === "error") send("error", { message: event.message });
           },
         });
-        send("done", { ok: true });
+        const generated = lastProposal as Proposal | null;
+        const billed = lastUsage as ModelUsage | null;
+        if (generated) {
+          const comparable = proposalToComparable(generated);
+          await patchStudio((current) => ({
+            ...current,
+            latestProposal: generated,
+            history: [
+              comparable,
+              ...current.history.filter((item) => item.id !== comparable.id),
+            ].slice(0, 50),
+          }));
+          await recordAudit(
+            actor,
+            "generate",
+            `Generated ${generated.projectTitle}`,
+            {
+              proposalId: generated.id,
+              projectTitle: generated.projectTitle,
+            },
+          );
+        }
+        if (billed && generated) {
+          await recordUsage(actor, "generate", billed, {
+            proposalId: generated.id,
+            projectTitle: generated.projectTitle,
+          });
+        }
+        send("done", { ok: true, usage: billed });
       } catch (error) {
         const message =
           error instanceof Error ? error.message : "Proposal generation failed.";

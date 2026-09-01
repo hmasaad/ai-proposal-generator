@@ -25,6 +25,7 @@ import type {
   DeliveryStory,
   EstimateLine,
   KickoffPlan,
+  ModelUsage,
   Proposal,
   RaidItem,
 } from "./types";
@@ -89,6 +90,7 @@ export async function generateKickoffAndRaid(proposal: Proposal, company: Compan
       generatedAt: new Date().toISOString(),
     } satisfies KickoffPlan,
     raid: withIds(drafted.object.raid),
+    usage: drafted.usage,
   };
 }
 
@@ -99,14 +101,17 @@ export async function generateEpics(proposal: Proposal) {
     system: EPICS_SYSTEM,
     prompt: epicsPrompt(JSON.stringify(deliveryContext(proposal), null, 2)),
   });
-  return withEpicKeys(epicPrefix(proposal.projectTitle), drafted.object.epics);
+  return {
+    epics: withEpicKeys(epicPrefix(proposal.projectTitle), drafted.object.epics),
+    usage: drafted.usage,
+  };
 }
 
 export async function generateChangeOrder(input: {
   proposal: Proposal;
   company: CompanyProfile;
   request: string;
-}): Promise<ChangeOrder> {
+}): Promise<{ changeOrder: ChangeOrder; usage: ModelUsage }> {
   const request = input.request.trim();
   if (!request) {
     throw new Error("Describe what the client added.");
@@ -142,21 +147,24 @@ export async function generateChangeOrder(input: {
   const rolled = rollupEstimates(lines, input.proposal.contingencyPct);
 
   return {
-    id: crypto.randomUUID(),
-    createdAt: new Date().toISOString(),
-    request,
-    title: draft.title,
-    inBaseline: draft.inBaseline,
-    rationale: draft.rationale,
-    addedScope: draft.inBaseline
-      ? []
-      : draft.addedScope.map((item) => ({ ...item, included: true })),
-    estimates: rolled.lines,
-    totalHours: draft.inBaseline ? 0 : rolled.totalHours,
-    totalCost: draft.inBaseline ? 0 : rolled.totalCost,
-    extraWeeks: draft.inBaseline ? 0 : Math.max(0, draft.extraWeeks),
-    assumptions: draft.assumptions,
-    clientLetter: draft.clientLetter,
-    status: "draft",
+    changeOrder: {
+      id: crypto.randomUUID(),
+      createdAt: new Date().toISOString(),
+      request,
+      title: draft.title,
+      inBaseline: draft.inBaseline,
+      rationale: draft.rationale,
+      addedScope: draft.inBaseline
+        ? []
+        : draft.addedScope.map((item) => ({ ...item, included: true })),
+      estimates: rolled.lines,
+      totalHours: draft.inBaseline ? 0 : rolled.totalHours,
+      totalCost: draft.inBaseline ? 0 : rolled.totalCost,
+      extraWeeks: draft.inBaseline ? 0 : Math.max(0, draft.extraWeeks),
+      assumptions: draft.assumptions,
+      clientLetter: draft.clientLetter,
+      status: "draft" as const,
+    },
+    usage: drafted.usage,
   };
 }
