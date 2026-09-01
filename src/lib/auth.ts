@@ -1,6 +1,7 @@
 import { randomBytes, scryptSync, timingSafeEqual } from "crypto";
 import { mkdir, readFile, writeFile } from "fs/promises";
 import path from "path";
+import { friendlyModelError, isFreeTierQuota } from "./model-errors";
 import { sessionFromRequest } from "./session";
 import type { SessionUser, StudioRole } from "./types";
 
@@ -147,6 +148,9 @@ export function jsonError(error: unknown) {
   if (error instanceof AuthError) {
     return Response.json({ error: error.message }, { status: error.status });
   }
-  const message = error instanceof Error ? error.message : "Request failed.";
-  return Response.json({ error: message }, { status: 500 });
+  const message = friendlyModelError(error);
+  return Response.json(
+    { error: message },
+    { status: isFreeTierQuota(error) ? 429 : 500 },
+  );
 }

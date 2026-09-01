@@ -5,10 +5,11 @@ export const AGENT_STEPS: { id: AgentStepId; label: string }[] = [
   { id: "extract", label: "Extract" },
   { id: "score", label: "Score" },
   { id: "learn", label: "RAG" },
-  { id: "scope", label: "Scope" },
-  { id: "estimate", label: "Estimate" },
-  { id: "draft", label: "Draft" },
+  { id: "scope", label: "Outline" },
+  { id: "estimate", label: "Price" },
+  { id: "draft", label: "Write" },
   { id: "review", label: "Review" },
+  { id: "validate", label: "Eval" },
 ];
 
 export function stepIndex(id: AgentStepId) {

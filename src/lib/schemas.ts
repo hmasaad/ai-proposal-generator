@@ -177,6 +177,169 @@ export const proposalDraftJsonSchema: Record<string, unknown> = {
   ],
 };
 
+const scopeItemSchema = z.object({
+  title: z.string(),
+  description: z.string(),
+  included: z.boolean(),
+});
+
+const phaseItemSchema = z.object({
+  name: z.string(),
+  durationWeeks: z.number(),
+  objectives: z.array(z.string()),
+  deliverables: z.array(z.string()),
+});
+
+const estimateLineSchema = z.object({
+  role: z.string(),
+  hours: z.number(),
+  rate: z.number(),
+  cost: z.number(),
+});
+
+export const proposalOutlineSchema = z.object({
+  clientName: z.string(),
+  projectTitle: z.string(),
+  scope: z.array(scopeItemSchema),
+  phases: z.array(phaseItemSchema),
+  deliverables: z.array(z.string()),
+  staffing: z.array(z.string()),
+});
+
+export const proposalEstimateSchema = z.object({
+  estimates: z.array(estimateLineSchema),
+  contingencyPct: z.number(),
+  leanCuts: z.array(z.string()),
+  paddedAdds: z.array(z.string()),
+});
+
+export const proposalProseSchema = z.object({
+  executiveSummary: z.string(),
+  understanding: z.string(),
+  approach: z.string(),
+  timelineSummary: z.string(),
+  assumptions: z.array(z.string()),
+  risks: z.array(
+    z.object({
+      risk: z.string(),
+      impact: z.enum(["low", "medium", "high"]),
+      likelihood: z.enum(["low", "medium", "high"]),
+      mitigation: z.string(),
+    }),
+  ),
+  openQuestions: z.array(z.string()),
+  nextSteps: z.array(z.string()),
+  weekOneNeeds: z.array(z.string()),
+});
+
+const scopeJson = {
+  type: "array",
+  items: {
+    type: "object",
+    properties: {
+      title: { type: "string" },
+      description: { type: "string" },
+      included: { type: "boolean" },
+    },
+    required: ["title", "description", "included"],
+  },
+};
+
+const phasesJson = {
+  type: "array",
+  items: {
+    type: "object",
+    properties: {
+      name: { type: "string" },
+      durationWeeks: { type: "number" },
+      objectives: { type: "array", items: { type: "string" } },
+      deliverables: { type: "array", items: { type: "string" } },
+    },
+    required: ["name", "durationWeeks", "objectives", "deliverables"],
+  },
+};
+
+export const proposalOutlineJsonSchema: Record<string, unknown> = {
+  type: "object",
+  properties: {
+    clientName: { type: "string" },
+    projectTitle: { type: "string" },
+    scope: scopeJson,
+    phases: phasesJson,
+    deliverables: { type: "array", items: { type: "string" } },
+    staffing: { type: "array", items: { type: "string" } },
+  },
+  required: [
+    "clientName",
+    "projectTitle",
+    "scope",
+    "phases",
+    "deliverables",
+    "staffing",
+  ],
+};
+
+export const proposalEstimateJsonSchema: Record<string, unknown> = {
+  type: "object",
+  properties: {
+    estimates: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          role: { type: "string" },
+          hours: { type: "number" },
+          rate: { type: "number" },
+          cost: { type: "number" },
+        },
+        required: ["role", "hours", "rate", "cost"],
+      },
+    },
+    contingencyPct: { type: "number" },
+    leanCuts: { type: "array", items: { type: "string" } },
+    paddedAdds: { type: "array", items: { type: "string" } },
+  },
+  required: ["estimates", "contingencyPct", "leanCuts", "paddedAdds"],
+};
+
+export const proposalProseJsonSchema: Record<string, unknown> = {
+  type: "object",
+  properties: {
+    executiveSummary: { type: "string" },
+    understanding: { type: "string" },
+    approach: { type: "string" },
+    timelineSummary: { type: "string" },
+    assumptions: { type: "array", items: { type: "string" } },
+    risks: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          risk: { type: "string" },
+          impact: { type: "string", enum: ["low", "medium", "high"] },
+          likelihood: { type: "string", enum: ["low", "medium", "high"] },
+          mitigation: { type: "string" },
+        },
+        required: ["risk", "impact", "likelihood", "mitigation"],
+      },
+    },
+    openQuestions: { type: "array", items: { type: "string" } },
+    nextSteps: { type: "array", items: { type: "string" } },
+    weekOneNeeds: { type: "array", items: { type: "string" } },
+  },
+  required: [
+    "executiveSummary",
+    "understanding",
+    "approach",
+    "timelineSummary",
+    "assumptions",
+    "risks",
+    "openQuestions",
+    "nextSteps",
+    "weekOneNeeds",
+  ],
+};
+
 export const rfpScoreSchema = z.object({
   competitorsNamed: z.array(z.string()),
   criteria: z.array(

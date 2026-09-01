@@ -2,7 +2,7 @@
 
 An AI agent for software houses that turns messy client intake into a proposal you can actually send.
 
-Sales, BAs, and PMs usually assemble a bid from emails, RFPs, meeting notes, transcripts, requirements docs, and old proposals. This agent reads those sources, extracts a structured brief, scores where you are strong or weak, retrieves similar past work with RAG, then drafts scope, timeline, estimates, assumptions, and risks against your studio rate card.
+Sales, BAs, and PMs usually assemble a bid from emails, RFPs, meeting notes, transcripts, requirements docs, and old proposals. This agent reads those sources, extracts a structured brief, scores where you are strong or weak, retrieves similar past work with RAG, then the **Proposal Writer Agent** outlines scope, prices the likely band on your rate card, and writes the client document. A reviewer checks it against logged mistakes before you send.
 
 ## What it produces
 
@@ -50,6 +50,33 @@ Tag the draft **Won**, then open **Delivery**.
 
 Log a mistake from a draft or on **Studio memory**. The next similar bid has to apply it.
 
+## Validation / evals
+
+Generate finishes with a **quality gate** (no extra model call):
+
+- Rate card, hours × rate, and contingency rollup
+- Included vs excluded scope; Epic / native apps / video stay out when the brief says so
+- Must-haves from the brief appear in the draft
+- Scored-out work is not included
+- Week-1 checklist, risks with mitigations, lean/padded notes
+
+Errors block **Client-ready**. Open **Evals** for the golden fixture suite (Meridian should pass; a broken Epic/rate fixture should fail). CI: `npm run eval`.
+
+## Proposal Writer Agent
+
+After extract, score, and RAG, generate is three writer passes plus a review:
+
+1. **Outline** — included vs excluded scope and phases (no hours yet).
+2. **Price** — likely-band hours on the locked rate card, plus lean cuts and padded unknowns.
+3. **Write** — client-facing prose locked to that outline and price.
+4. **Review** — delivery director pass against retrieved mistakes.
+
+Scope and price are committed before anyone writes the executive summary, so the story cannot drift from the commercial skeleton.
+
+## Win Probability Agent
+
+After generate, the draft includes an internal **win probability** (no extra model call). It scores the bid from the RFP scorecard, studio tech stack, similar closed bids, deadline pace, and price vs historical average. Meridian sample: **68%** — strong technical fit, similar clinic work, stack match; aggressive 16-week deadline and price above the similar-bid average.
+
 ## Product / ops
 
 Sign in. Studio memory (profile, lessons, knowledge, past bids, RAG) lives on the server in `data/`, so the next person on another browser gets the same studio.
@@ -79,13 +106,15 @@ Open [http://localhost:3000](http://localhost:3000) and sign in.
 
 Gemini 3.6 Flash via the Interactions API. Optional fallback: `OPENAI_API_KEY`.
 
+Free-tier Gemini allows **20 generate requests per day**. One proposal uses several (extract, score, outline, price, write, review), so a few runs will hit the cap. Waiting the “retry in 50s” does not reset the daily quota — wait until it refreshes, or enable billing at [Google AI Studio](https://aistudio.google.com/). `npm run eval` and **View sample proposal** do not call Gemini.
+
 ## How to use it
 
 1. Sign in. Finance locks rates on **Studio profile**. Sales drafts.
 2. Edit **Studio profile** with your company name, stack, and rates. Index SOWs and case studies on **Studio memory**.
 3. On **New proposal**, upload files, paste a Gmail/Outlook thread, or import a Zoom/Meet transcript.
 3. Or load the sample Meridian Health brief, or open **View sample proposal**.
-4. Generate. Pipeline: ingest → extract → score → RAG retrieve → draft → review.
-5. On the draft, review the internal scorecard, then log what went wrong so the vector store learns.
+4. Generate. The **Proposal Writer Agent** outlines scope, prices the likely band, writes the client document, then a reviewer checks it against studio memory. Pipeline: ingest → extract → score → RAG → outline → price → write → review.
+5. On the draft, review the **validation report** and the internal scorecard, then log what went wrong so the vector store learns. Errors must be fixed before **Client-ready**.
 6. Export a **branded PDF** (cover, SOW, commercial appendix, MSA), a **board one-pager**, split SOW/commercial packs, or **Word / Google Docs** (`.docx`). Logo and legal template live on **Studio profile**.
 7. When they say yes, tag **Won** and open **Delivery** for kickoff, RAID, Jira/Linear epics, and change orders.

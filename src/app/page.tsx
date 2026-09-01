@@ -11,7 +11,8 @@ import { canDraft } from "@/lib/permissions";
 import { formatUsd, money } from "@/lib/format";
 import { SAMPLE_PROPOSAL } from "@/lib/sample-proposal";
 import { SAMPLE_SOURCES } from "@/lib/sample-rfp";
-import { fetchMe, hydrateStudio, loadCompany, saveProposal } from "@/lib/storage";
+import { withStudioChecks } from "@/lib/win-probability";
+import { fetchMe, hydrateStudio, loadCompany, loadHistory, saveProposal } from "@/lib/storage";
 import type {
   AgentStepEvent,
   AgentStepId,
@@ -47,7 +48,7 @@ export default function HomePage() {
     setError(null);
     setRunning(true);
     setCurrent("ingest");
-    setMessage("Starting the proposal agent…");
+    setMessage("Starting the Proposal Writer Agent…");
 
     try {
       const response = await fetch("/api/generate", {
@@ -122,7 +123,13 @@ export default function HomePage() {
               type="button"
               disabled={running}
               onClick={() => {
-                saveProposal(SAMPLE_PROPOSAL, { share: true, index: false });
+                saveProposal(
+                  withStudioChecks(SAMPLE_PROPOSAL, company, {
+                    sources: SAMPLE_SOURCES,
+                    history: loadHistory(),
+                  }),
+                  { share: true, index: false },
+                );
                 router.push("/proposal");
               }}
               className="rounded-full border border-rule px-4 py-2 text-sm"
@@ -148,11 +155,11 @@ export default function HomePage() {
 
         <aside className="lg:sticky lg:top-6 lg:self-start">
           <div className="rounded-3xl border border-rule bg-white/40 p-5">
-            <h2 className="font-serif text-2xl">Generate</h2>
+            <h2 className="font-serif text-2xl">Proposal Writer Agent</h2>
             <p className="mt-2 text-sm leading-6 text-ink-soft">
-              Uses {company.name} rates and the{" "}
-              {PROJECT_TYPES.find((item) => item.id === projectType)?.label} mix.
-              Shared studio memory (lessons, SOWs, past bids) is loaded on the server.
+              Outlines scope, prices the likely band on {company.name} rates (
+              {PROJECT_TYPES.find((item) => item.id === projectType)?.label} mix), then writes the
+              client document. Shared studio memory is loaded on the server.
             </p>
             {me && !canDraft(me.role) && (
               <p className="mt-3 text-sm text-ink-soft">
@@ -220,7 +227,7 @@ export default function HomePage() {
               onClick={() => void generate()}
               className="mt-5 w-full rounded-full bg-forest py-3 text-sm text-paper disabled:opacity-40"
             >
-              {running ? "Agent working…" : "Generate proposal"}
+              {running ? "Writer working…" : "Generate proposal"}
             </button>
             {usage && (
               <p className="mt-3 text-xs leading-5 text-ink-soft">
@@ -229,8 +236,9 @@ export default function HomePage() {
             )}
             <p className="mt-3 text-xs leading-5 text-ink-soft">
               Needs <code className="rounded bg-paper-2 px-1">GEMINI_API_KEY</code> in{" "}
-              <code className="rounded bg-paper-2 px-1">.env.local</code>. Gemini embeds studio
-              memory, retrieves the closest chunks, scores the RFP, then drafts and reviews.
+              <code className="rounded bg-paper-2 px-1">.env.local</code>. Gemini free tier is 20
+              generate requests per day; one proposal uses several. Quota resets daily, or enable
+              billing in AI Studio.
             </p>
           </div>
 
@@ -239,7 +247,7 @@ export default function HomePage() {
           </div>
 
           {error && (
-            <p className="mt-4 rounded-2xl border border-copper/30 bg-copper/10 px-4 py-3 text-sm text-copper">
+            <p className="mt-4 rounded-2xl border border-copper/30 bg-copper/10 px-4 py-3 text-sm leading-6 text-copper">
               {error}
             </p>
           )}

@@ -11,6 +11,7 @@ const links = [
   { href: "/", label: "New proposal" },
   { href: "/proposal", label: "Latest draft" },
   { href: "/delivery", label: "Delivery" },
+  { href: "/evals", label: "Evals" },
   { href: "/lessons", label: "Studio memory" },
   { href: "/settings", label: "Studio profile" },
 ];

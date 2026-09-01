@@ -322,6 +322,45 @@ export interface Proposal {
     text: string;
     score: number;
   }[];
+  validation?: ValidationReport;
+  winProbability?: WinProbability;
+}
+
+export type WinPolarity = "positive" | "negative";
+
+export interface WinFactor {
+  id: string;
+  polarity: WinPolarity;
+  label: string;
+  detail: string;
+}
+
+export interface WinProbability {
+  percent: number;
+  summary: string;
+  historyCount: number;
+  similarCount: number;
+  positives: WinFactor[];
+  negatives: WinFactor[];
+}
+
+export type EvalSeverity = "error" | "warning";
+
+export interface EvalCheck {
+  id: string;
+  label: string;
+  severity: EvalSeverity;
+  pass: boolean;
+  detail: string;
+}
+
+export interface ValidationReport {
+  at: string;
+  passed: boolean;
+  score: number;
+  errorCount: number;
+  warningCount: number;
+  checks: EvalCheck[];
 }
 
 export type AgentStepId =
@@ -332,7 +371,8 @@ export type AgentStepId =
   | "scope"
   | "estimate"
   | "draft"
-  | "review";
+  | "review"
+  | "validate";
 
 export interface AgentStepEvent {
   id: AgentStepId;

@@ -7,6 +7,7 @@ import {
 } from "./accuracy";
 import { addUsage, emptyUsage } from "./pricing";
 import { generateStructured } from "./model";
+import { isFreeTierQuota } from "./model-errors";
 import {
   proposalDraftJsonSchema,
   proposalDraftSchema,
@@ -16,20 +17,20 @@ import {
   rfpScoreSchema,
 } from "./schemas";
 import {
-  DRAFT_SYSTEM,
   EXTRACT_SYSTEM,
   REVIEW_SYSTEM,
   REVISE_SYSTEM,
   SCORE_SYSTEM,
   TRANSLATE_SYSTEM,
-  draftPrompt,
   extractPrompt,
   reviewPrompt,
   revisePrompt,
   scorePrompt,
   translatePrompt,
 } from "./prompts";
+import { withStudioChecks } from "./win-probability";
 import { indexProposal, retrieveContext } from "./rag/retrieve";
+import { runProposalWriter } from "./writer-agent";
 import type {
   AgentStepEvent,
   BidComparable,
@@ -165,40 +166,24 @@ export async function runProposalAgent(input: {
     type: "step",
     step: {
       id: "scope",
-      label: "Defining scope, phases, and exclusions",
+      label: "Writer outlining scope and phases",
       detail: extracted.object.projectTitle,
     },
   });
 
-  onEvent({
-    type: "step",
-    step: {
-      id: "estimate",
-      label: "Building effort and cost model",
-      detail: `${projectType} rate mix · likely / lean / padded bands`,
+  const written = await runProposalWriter({
+    sources,
+    company,
+    briefJson: JSON.stringify(extracted.object, null, 2),
+    score: scored.object,
+    memory,
+    projectType,
+    pastBids,
+    onStep: (id, label, detail) => {
+      onEvent({ type: "step", step: { id, label, detail } });
     },
   });
-
-  onEvent({
-    type: "step",
-    step: { id: "draft", label: "Drafting the proposal with retrieved memory" },
-  });
-
-  const drafted = await generateStructured({
-    schema: proposalDraftSchema,
-    jsonSchema: proposalDraftJsonSchema,
-    system: DRAFT_SYSTEM,
-    prompt: draftPrompt(
-      sources,
-      company,
-      JSON.stringify(extracted.object, null, 2),
-      memory,
-      projectType,
-      pastBids,
-      scored.object,
-    ),
-  });
-  usage = addUsage(usage, drafted.usage);
+  usage = addUsage(usage, written.usage);
 
   onEvent({
     type: "step",
@@ -208,21 +193,33 @@ export async function runProposalAgent(input: {
     },
   });
 
-  const reviewed = await generateStructured({
-    schema: proposalDraftSchema,
-    jsonSchema: proposalDraftJsonSchema,
-    system: REVIEW_SYSTEM,
-    prompt: reviewPrompt(
-      company,
-      JSON.stringify(drafted.object, null, 2),
-      extracted.object.unknownOrMissing,
-      memory,
-      scored.object,
-    ),
-  });
-  usage = addUsage(usage, reviewed.usage);
-
-  const draft = reviewed.object;
+  let draft = written.draft;
+  try {
+    const reviewed = await generateStructured({
+      schema: proposalDraftSchema,
+      jsonSchema: proposalDraftJsonSchema,
+      system: REVIEW_SYSTEM,
+      prompt: reviewPrompt(
+        company,
+        JSON.stringify(written.draft, null, 2),
+        extracted.object.unknownOrMissing,
+        memory,
+        scored.object,
+      ),
+    });
+    usage = addUsage(usage, reviewed.usage);
+    draft = reviewed.object;
+  } catch (error) {
+    if (!isFreeTierQuota(error)) throw error;
+    onEvent({
+      type: "step",
+      step: {
+        id: "review",
+        label: "Review skipped — Gemini free-tier quota hit",
+        detail: "Keeping the writer draft. Quality gate still runs.",
+      },
+    });
+  }
   const rolled = totals(draft.estimates, draft.contingencyPct);
   const bands = computeBands(rolled.totalHours, rolled.totalCost);
   const comparables = similarBids(pastBids, {
@@ -279,11 +276,34 @@ export async function runProposalAgent(input: {
     })),
   };
 
-  void indexProposal(proposal).catch(() => undefined);
+  onEvent({
+    type: "step",
+    step: { id: "validate", label: "Running validation evals" },
+  });
+  const checked = withStudioChecks(proposal, company, { sources, history: pastBids });
+  const report = checked.validation;
+  const win = checked.winProbability;
+  onEvent({
+    type: "step",
+    step: {
+      id: "validate",
+      label: "Running validation evals",
+      detail: [
+        report
+          ? `${report.score}/100 · ${report.errorCount} error${report.errorCount === 1 ? "" : "s"}`
+          : null,
+        win ? `${win.percent}% win` : null,
+      ]
+        .filter(Boolean)
+        .join(" · "),
+    },
+  });
+
+  void indexProposal(checked).catch(() => undefined);
 
   onEvent({ type: "usage", usage });
-  onEvent({ type: "proposal", proposal });
-  return proposal;
+  onEvent({ type: "proposal", proposal: checked });
+  return checked;
 }
 
 function generatedAsProposal(

@@ -22,12 +22,16 @@ import {
   loadVersions,
   pushVersion,
   saveAuthor,
+  loadHistory,
   saveProposal,
   fetchMe,
   hydrateStudio,
 } from "@/lib/storage";
 import { formatDate, formatDateTime, money, newId } from "@/lib/format";
 import { outcomeLesson, projectTypeLabel } from "@/lib/accuracy";
+import { withStudioChecks } from "@/lib/win-probability";
+import { ValidationReportCard } from "@/components/ValidationReport";
+import { WinProbabilityCard } from "@/components/WinProbability";
 import { diffProposals } from "@/lib/proposal-diff";
 import { printClientPack } from "@/lib/export-pack";
 import {
@@ -68,8 +72,13 @@ export default function ProposalPage() {
       const user = await fetchMe();
       await hydrateStudio();
       const loaded = loadProposal();
-      setProposal(loaded);
-      setCompany(loadCompany());
+      const profile = loadCompany();
+      setCompany(profile);
+      if (loaded && profile) {
+        setProposal(withStudioChecks(loaded, profile, { history: loadHistory() }));
+      } else {
+        setProposal(loaded);
+      }
       const name = user?.name || loadAuthor();
       setAuthor(name);
       saveAuthor(name);
@@ -90,14 +99,17 @@ export default function ProposalPage() {
       ...next,
       updatedAt: new Date().toISOString(),
     });
+    const checked = company
+      ? withStudioChecks(rolled, company, { history: loadHistory() })
+      : rolled;
     if (checkpoint && proposal) {
       setVersions(pushVersion(proposal, checkpoint));
     }
-    setProposal(rolled);
-    saveProposal(rolled, {
+    setProposal(checked);
+    saveProposal(checked, {
       index: Boolean(checkpoint),
-      share: Boolean(checkpoint) || rolled.outcome === "sent" || rolled.outcome === "won",
-      sent: rolled.outcome === "sent" && proposal?.outcome !== "sent",
+      share: Boolean(checkpoint) || checked.outcome === "sent" || checked.outcome === "won",
+      sent: checked.outcome === "sent" && proposal?.outcome !== "sent",
     });
   }
 
@@ -227,7 +239,18 @@ export default function ProposalPage() {
                   <button
                     key={item.id}
                     type="button"
-                    onClick={() => persist({ ...proposal, reviewStatus: item.id as ReviewStatus })}
+                    onClick={() => {
+                      if (
+                        item.id === "client_ready" &&
+                        (proposal.validation?.errorCount ?? 0) > 0
+                      ) {
+                        setError(
+                          "Fix validation errors before marking client-ready. Open Evals or the report on this draft.",
+                        );
+                        return;
+                      }
+                      persist({ ...proposal, reviewStatus: item.id as ReviewStatus });
+                    }}
                     className={`rounded-2xl px-3 py-2 text-left text-sm ${
                       (proposal.reviewStatus ?? "draft") === item.id
                         ? "bg-forest text-paper"
@@ -504,6 +527,8 @@ export default function ProposalPage() {
               if (lesson) addLesson(lesson);
             }}
           />
+          {proposal.winProbability && <WinProbabilityCard report={proposal.winProbability} />}
+          {proposal.validation && <ValidationReportCard report={proposal.validation} />}
           {proposal.rfpScore && <RfpScorecard score={proposal.rfpScore} />}
           {proposal.comparables && proposal.comparables.length > 0 && (
             <section className="no-print mt-8 rounded-3xl border border-rule bg-white/50 p-5">

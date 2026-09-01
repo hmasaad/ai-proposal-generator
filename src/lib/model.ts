@@ -3,6 +3,7 @@ import { generateObject } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
 import type { z } from "zod";
 import { emptyUsage, usageFromCounts } from "./pricing";
+import { friendlyModelError, retryDelayMs } from "./model-errors";
 import type { ModelUsage } from "./types";
 
 const DEFAULT_GEMINI_MODEL = "gemini-3.6-flash";
@@ -41,6 +42,10 @@ function usageFromInteraction(interaction: unknown, model: string): ModelUsage {
   });
 }
 
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 export async function generateStructured<T extends z.ZodTypeAny>(input: {
   schema: T;
   jsonSchema: Record<string, unknown>;
@@ -53,23 +58,36 @@ export async function generateStructured<T extends z.ZodTypeAny>(input: {
 
   if (key) {
     const ai = new GoogleGenAI({ apiKey: key });
-    const interaction = await ai.interactions.create({
-      model: geminiModel,
-      system_instruction: input.system,
-      input: input.prompt,
-      response_format: [
-        {
-          type: "text",
-          mime_type: "application/json",
-          schema: input.jsonSchema,
-        },
-      ],
-    });
-    const parsed = JSON.parse(stripFences(outputText(interaction)));
-    return {
-      object: input.schema.parse(parsed),
-      usage: usageFromInteraction(interaction, geminiModel),
-    };
+    let lastError: unknown;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const interaction = await ai.interactions.create({
+          model: geminiModel,
+          system_instruction: input.system,
+          input: input.prompt,
+          response_format: [
+            {
+              type: "text",
+              mime_type: "application/json",
+              schema: input.jsonSchema,
+            },
+          ],
+        });
+        const parsed = JSON.parse(stripFences(outputText(interaction)));
+        return {
+          object: input.schema.parse(parsed),
+          usage: usageFromInteraction(interaction, geminiModel),
+        };
+      } catch (error) {
+        lastError = error;
+        const wait = retryDelayMs(error);
+        if (wait == null || attempt === 2) {
+          throw new Error(friendlyModelError(error));
+        }
+        await sleep(wait);
+      }
+    }
+    throw new Error(friendlyModelError(lastError ?? "Gemini request failed."));
   }
 
   if (openaiKey && !openaiKey.includes("your-key")) {

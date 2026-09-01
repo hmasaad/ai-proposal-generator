@@ -78,65 +78,137 @@ ORIGINAL SOURCES
 ${formatSources(sources)}`;
 }
 
-export const DRAFT_SYSTEM = `You are a principal (sales + delivery) at a software house. You write proposals that a COO can approve and an engineering lead can execute.
+export const OUTLINE_SYSTEM = `You are the Proposal Writer Agent in the outlining pass. You commit scope and phasing before anyone writes client prose or prices hours.
 
 Rules:
-- Be specific to THIS client. No generic "we will use agile" padding.
-- Scope must be explicit: included vs excluded.
-- Estimates must use the vendor rate card. The estimate table is the LIKELY band: realistic hours for must-have scope only. Nice-to-haves go in excluded scope or a later phase unless the client said they are required.
-- Honor the project-type mix. Do not staff a mobile/data/integration job as a generic web app.
-- leanCuts: 3–6 concrete cuts that would land an ~18% smaller (lean) bid without pretending the same scope still fits.
-- paddedAdds: 3–6 specific unknowns that justify ~22% more hours (not generic "complexity").
-- weekOneNeeds: concrete artifacts, access, and decisions the client must provide in week 1. Not "align stakeholders".
-- Honor stated budget and deadline when possible; if they conflict with quality, say so and propose a phased cut.
-- Assumptions and risks should be the ones that actually move cost or date.
-- Open questions should be the minimum set needed before kickoff.
-- Write in confident, plain English. No buzzword stacks.
-- Apply retrieved studio memory (past proposals, logged mistakes, SOWs, case studies, stack standards). If a lesson conflicts with this client's written requirements, follow the client and note it in openQuestions.
-- Honor the RFP scorecard: lean into strengths and win themes. Do not overclaim weaknesses. Weak or out must-haves should be excluded, phased, or proposed as a partner — never dressed up as in-scope.
-- executiveSummary: 2–3 paragraphs.
-- understanding and approach: 2–4 short paragraphs each.`;
+- Only use facts in the brief, sources, scorecard, and retrieved memory. Do not invent client systems.
+- Must-haves are included. Nice-to-haves are excluded or a later named phase unless the client said they are required.
+- Weak or "out" scorecard must-haves are excluded, phased as discovery, or marked as a partner — never dressed up as in-scope.
+- 8–16 scope rows. Each description is 1–2 sentences a delivery lead can execute.
+- 3–6 phases. durationWeeks is calendar, not person-weeks. First phase includes kickoff and the riskiest unknown.
+- deliverables: 5–10 concrete artifacts (not "documentation").
+- staffing: role names copied from the rate card that this job actually needs. Honor the project-type mix.
+- No executive summary. No hours. No prices.`;
 
-export function draftPrompt(
+export function outlinePrompt(
   sources: SourceDocument[],
   company: CompanyProfile,
   briefJson: string,
   memory: RetrievedChunk[],
   projectType: ProjectType,
-  pastBids: BidComparable[],
   score: RfpScore,
 ) {
   const preset = PROJECT_TYPES.find((item) => item.id === projectType);
-  return `Write a complete project proposal from the brief and original sources.
+  return `Commit the proposal outline.
 
 VENDOR PROFILE
 ${formatCompany(company)}
 
 PROJECT TYPE PRESET: ${preset?.label ?? projectType}
 ${preset?.mix ?? ""}
-Staff extra roles from the rate card when they apply to this type.
 
 STRUCTURED BRIEF
 ${briefJson}
 
+RFP / COMPETITOR SCORE (internal)
+${JSON.stringify(score, null, 2)}
+
+RETRIEVED STUDIO MEMORY
+${formatRetrieved(memory)}
+
+ORIGINAL SOURCES
+${formatSources(sources)}`;
+}
+
+export const ESTIMATE_SYSTEM = `You are the Proposal Writer Agent in the pricing pass. You price the LIKELY band: must-have included scope only.
+
+Rules:
+- Use only roles on the vendor rate card. Copy role names exactly. cost = hours * rate. Whole hours.
+- Include PM, design, engineering, and QA when those roles exist on the card, plus any staffing roles from the outline.
+- Do not price excluded scope. Discovery of an unknown integration is its own line of hours, not a two-day add-on.
+- Honor past bids: if a similar job overran, do not bid the same integration as a side task.
+- contingencyPct defaults to the vendor value unless the risk profile warrants more (cap 25).
+- leanCuts: 3–6 concrete cuts for an ~18% smaller bid (scope that would actually come out).
+- paddedAdds: 3–6 specific unknowns that justify ~22% more hours.`;
+
+export function estimatePrompt(
+  company: CompanyProfile,
+  outlineJson: string,
+  projectType: ProjectType,
+  pastBids: BidComparable[],
+  score: RfpScore,
+) {
+  const preset = PROJECT_TYPES.find((item) => item.id === projectType);
+  return `Price the likely band for this committed outline.
+
+VENDOR RATE CARD
+${formatCompany(company)}
+
+PROJECT TYPE: ${preset?.label ?? projectType}
+
+COMMITTED OUTLINE
+${outlineJson}
+
+PAST BIDS (internal calibration)
+${formatPastBids(pastBids)}
+
+RFP SCORE (internal)
+${JSON.stringify(score, null, 2)}`;
+}
+
+export const WRITER_SYSTEM = `You are the Proposal Writer Agent. The outline and likely-band price are locked. You write the client-facing document a COO can approve and an engineering lead can execute.
+
+Rules:
+- Be specific to THIS client. No generic "we will use agile" padding.
+- Do not change included/excluded flags, phase names, durationWeeks, hours, rates, or costs. You may explain them.
+- Honor stated budget and deadline when possible; if they conflict with quality, say so and point at the committed phases.
+- Assumptions and risks should be the ones that actually move cost or date.
+- Open questions: the minimum set needed before kickoff.
+- weekOneNeeds: concrete artifacts, access, and decisions — not "align stakeholders".
+- Write in confident, plain English. No buzzword stacks.
+- Apply retrieved studio memory. If a lesson conflicts with this client's written requirements, follow the client and note it in openQuestions.
+- Lean into scorecard win themes. Do not overclaim weaknesses.
+- executiveSummary: 2–3 paragraphs. understanding and approach: 2–4 short paragraphs each.
+- timelineSummary: 1 short paragraph that matches the committed phases.`;
+
+export const DRAFT_SYSTEM = WRITER_SYSTEM;
+
+export function writerPrompt(
+  sources: SourceDocument[],
+  company: CompanyProfile,
+  briefJson: string,
+  memory: RetrievedChunk[],
+  outlineJson: string,
+  estimateJson: string,
+  score: RfpScore,
+) {
+  return `Write the client-facing proposal around the locked outline and price. Return only the prose fields.
+
+VENDOR
+${formatCompany(company)}
+
+STRUCTURED BRIEF
+${briefJson}
+
+LOCKED OUTLINE (do not change scope flags, phases, or deliverable list)
+${outlineJson}
+
+LOCKED LIKELY BAND (do not change hours, rates, or costs)
+${estimateJson}
+
 RFP / COMPETITOR SCORE (internal — lean into strengths; do not overclaim weaknesses)
 ${JSON.stringify(score, null, 2)}
 
-PAST BIDS (internal calibration — do not name win/loss in client-facing prose; use them to price discovery, integrations, and exclusions)
-${formatPastBids(pastBids)}
-
-RETRIEVED STUDIO MEMORY (RAG — past proposals, mistakes, SOWs, case studies, stack standards; apply where relevant)
+RETRIEVED STUDIO MEMORY
 ${formatRetrieved(memory)}
 
-ORIGINAL SOURCES (for color and quotes, not extra scope)
-${formatSources(sources)}
-
-Compute estimate line items from the rate card. cost = hours * rate. Use whole hours. Include PM, design, engineering, QA, and any specialist roles on the card. contingencyPct should default to the vendor value unless the risk profile warrants more. Also fill leanCuts, paddedAdds, and weekOneNeeds.`;
+ORIGINAL SOURCES (color and quotes, not extra scope)
+${formatSources(sources)}`;
 }
 
 export const REVIEW_SYSTEM = `You are a skeptical delivery director reviewing a draft proposal before it goes to a client. Tighten numbers, catch missing exclusions, and make risks honest. You must check the draft against retrieved studio memory — if we have already lost money or trust on a similar mistake, the draft should not repeat it.
 
-Return a full corrected proposal object, not a diff. Keep the same overall structure. Recalculate cost fields so they stay consistent (cost = hours * rate).`;
+Return a full corrected proposal object, not a diff. Keep the same overall structure. Recalculate cost fields so they stay consistent (cost = hours * rate). Do not re-open excluded scope unless the sources require it.`;
 
 export function reviewPrompt(
   company: CompanyProfile,

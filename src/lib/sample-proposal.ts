@@ -6,7 +6,7 @@ export const SAMPLE_PROPOSAL: Proposal = {
   clientName: "Meridian Health Network",
   projectTitle: "Patient Access Portal — v1 delivery proposal",
   executiveSummary:
-    "Meridian’s clinics still schedule by phone and Google Calendar. That produces double-books, 18 hours a week of callbacks, and a no-show problem that hits Monday physicals hardest. This proposal covers a patient portal and staff console that make online booking the default path, with digital intake, reminders that stay HIPAA-safe, and optional balance pay.\n\nWe recommend building a focused v1 rather than buying a suite like Phreesia. Meridian’s calendars are not centralized, Epic is explicitly out of the first release, and proxy access for pediatrics is a hard requirement those products often bury in a larger rollout. A custom portal lets us make booking quality the product, then add payments and FHIR later without paying for a platform Meridian will only half-use.\n\nWe can deliver in 16 weeks for a likely investment of about $214k including contingency, inside the $180–260k band. Payments can slip a quarter if scope pressure appears; booking, proxy access, and a single staff calendar cannot.",
+    "Meridian’s clinics still schedule by phone and Google Calendar. That produces double-books, 18 hours a week of callbacks, and a no-show problem that hits Monday physicals hardest. This proposal covers a patient portal and staff console that make online booking the default path, with digital intake, reminders that stay HIPAA-safe, and optional balance pay.\n\nWe recommend building a focused v1 rather than buying a suite like Phreesia. Meridian’s calendars are not centralized, Epic is explicitly out of the first release, and proxy access for pediatrics is a hard requirement those products often bury in a larger rollout. A custom portal lets us make booking quality the product, then add payments and FHIR later without paying for a platform Meridian will only half-use.\n\nWe can deliver in 16 weeks for a likely investment of about $226k including contingency, inside the $180–260k band. Payments can slip a quarter if scope pressure appears; booking, proxy access, and a single staff calendar cannot.",
   understanding:
     "Priya and the clinic managers are not asking for a patient ‘engagement platform.’ They are asking to stop running four clinics plus a hospital on disconnected calendars. Front desk cannot see the same truth, patients cannot self-serve, and billing balances live in a weekly CSV from Candid/QuickBooks.\n\nConstraints that shape the design: US hosting, WCAG 2.2 AA, staff MFA, Microsoft Entra ID for staff if possible, no visit reason in SMS, and family/proxy access for two pediatric clinics. Epic/FHIR is a later phase. Success is measurable: 40% of new appointments booked online within 90 days, and a drop in scheduling callbacks.",
   approach:
@@ -137,7 +137,7 @@ export const SAMPLE_PROPOSAL: Proposal = {
     { role: "QA / automation", hours: 160, rate: 95, cost: 15200 },
   ],
   totalHours: 1460,
-  totalCost: 226310,
+  totalCost: 225860,
   contingencyPct: 15,
   timelineSummary:
     "16 weeks from kickoff to go-live, matching Meridian’s target. Discovery runs in parallel with legal review. If legal or Entra ID access slips, we freeze payments first—not booking.",
@@ -227,11 +227,11 @@ export const SAMPLE_PROPOSAL: Proposal = {
   projectType: "integration",
   estimateBands: {
     leanHours: 1197,
-    leanCost: 185574,
+    leanCost: 185205,
     likelyHours: 1460,
-    likelyCost: 226310,
+    likelyCost: 225860,
     paddedHours: 1781,
-    paddedCost: 276098,
+    paddedCost: 275549,
   },
   leanCuts: [
     "Defer Stripe/balance pay to a later quarter",

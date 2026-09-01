@@ -44,6 +44,31 @@ export function ratesForType(
   return { ...company, rates: [...company.rates, ...extras] };
 }
 
+export function pinEstimatesToRateCard(
+  estimates: { role: string; hours: number; rate: number; cost: number }[],
+  company: CompanyProfile,
+) {
+  const byRole = new Map<string, { role: string; hours: number; rate: number; cost: number }>();
+  for (const row of estimates) {
+    const needle = row.role.toLowerCase().trim();
+    const match =
+      company.rates.find((item) => item.role.toLowerCase() === needle) ??
+      company.rates.find(
+        (item) =>
+          item.role.toLowerCase().includes(needle) ||
+          needle.includes(item.role.toLowerCase()),
+      );
+    const role = match?.role ?? row.role;
+    const rate = match?.hourlyRate ?? Math.max(0, row.rate);
+    const hours = Math.max(0, Math.round(row.hours));
+    const prev = byRole.get(role);
+    const nextHours = (prev?.hours ?? 0) + hours;
+    byRole.set(role, { role, hours: nextHours, rate, cost: nextHours * rate });
+  }
+  const pinned = [...byRole.values()].filter((row) => row.hours > 0);
+  return pinned.length ? pinned : estimates;
+}
+
 export function rollupEstimates(
   estimates: { role: string; hours: number; rate: number; cost: number }[],
   contingencyPct: number,

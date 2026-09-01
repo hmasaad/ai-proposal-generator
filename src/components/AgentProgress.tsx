@@ -16,14 +16,14 @@ export function AgentProgress({
 
   return (
     <div className="rounded-2xl border border-rule bg-white/50 p-4">
-      <ol className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-8">
+      <ol className="grid grid-cols-3 gap-1.5">
         {AGENT_STEPS.map((step, index) => {
           const done = running && index < active;
           const isCurrent = running && index === active;
           return (
             <li
               key={step.id}
-              className={`rounded-xl px-2 py-2 text-center text-xs ${
+              className={`flex min-h-8 items-center justify-center rounded-lg px-2 py-1.5 text-center text-[11px] leading-4 ${
                 isCurrent
                   ? "bg-forest text-paper"
                   : done

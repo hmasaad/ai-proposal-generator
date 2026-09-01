@@ -1,6 +1,7 @@
 import { runProposalAgent } from "@/lib/agent";
 import { recordAudit } from "@/lib/audit";
 import { jsonError, requireSession } from "@/lib/auth";
+import { friendlyModelError } from "@/lib/model-errors";
 import { canDraft } from "@/lib/session";
 import { loadStudio, patchStudio } from "@/lib/studio-store";
 import { recordUsage } from "@/lib/usage";
@@ -8,7 +9,7 @@ import { proposalToComparable } from "@/lib/accuracy";
 import type { ModelUsage, ProjectType, Proposal, SourceDocument } from "@/lib/types";
 
 export const runtime = "nodejs";
-export const maxDuration = 120;
+export const maxDuration = 300;
 
 function sse(event: string, data: unknown) {
   return `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
@@ -107,9 +108,7 @@ export async function POST(request: Request) {
         }
         send("done", { ok: true, usage: billed });
       } catch (error) {
-        const message =
-          error instanceof Error ? error.message : "Proposal generation failed.";
-        send("error", { message });
+        send("error", { message: friendlyModelError(error) });
       } finally {
         controller.close();
       }

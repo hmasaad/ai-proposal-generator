@@ -4,6 +4,7 @@ import { jsonError, requireSession } from "@/lib/auth";
 import { canDraft } from "@/lib/session";
 import { loadStudio } from "@/lib/studio-store";
 import { recordUsage } from "@/lib/usage";
+import { withStudioChecks } from "@/lib/win-probability";
 import type { OutputLanguage, Proposal, ProposalSectionId } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -47,7 +48,12 @@ export async function POST(request: Request) {
       });
       await recordAudit(user, "translate", `Translated to ${body.language}`, extra);
       await recordUsage(user, "translate", result.usage, extra);
-      return Response.json({ proposal: result.proposal, usage: result.usage });
+      return Response.json({
+        proposal: withStudioChecks(result.proposal, studio.company, {
+          history: studio.history,
+        }),
+        usage: result.usage,
+      });
     }
 
     const result = await reviseProposalSections({
@@ -64,7 +70,12 @@ export async function POST(request: Request) {
       extra,
     );
     await recordUsage(user, "revise", result.usage, extra);
-    return Response.json({ proposal: result.proposal, usage: result.usage });
+    return Response.json({
+      proposal: withStudioChecks(result.proposal, studio.company, {
+        history: studio.history,
+      }),
+      usage: result.usage,
+    });
   } catch (error) {
     return jsonError(error);
   }
